@@ -171,24 +171,6 @@ def main():
                         f"Could not automatically detect file type for {input_path}"
                     )
                     return
-                answer = (
-                    input(
-                        f"Detected input file type as '{detected}'. Use that? (y/n): "
-                    )
-                    .strip()
-                    .lower()
-                )
-                if answer.startswith("n"):
-                    user_in = (
-                        input("Enter the input file type (csv, json, parquet, excel): ")
-                        .strip()
-                        .lower()
-                    )
-                    try:
-                        in_type = FILE_TYPE_ALIASES[user_in]
-                    except KeyError:
-                        logging.error(f"Unsupported input format: {user_in}")
-                        return
                 else:
                     in_type = detected
 

@@ -24,98 +24,32 @@ DuckDB reference:
 - Python API reference: https://duckdb.org/docs/api/python/reference/
 """
 
-import argparse
 import logging
 from pathlib import Path
-from typing import Optional, Union, Tuple
 import duckdb
+
+# Import CLI-related functions and constants from cli.py
+from cli import (
+    FILE_TYPE_ALIASES,
+    parse_cli_arguments,
+    get_file_type_by_extension,
+    prompt_excel_options,
+)
 
 # Configure logging
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
 
-# Mapping file extensions to input type names.
-ALLOWED_EXT_MAP = {
-    ".csv": "csv",
-    ".txt": "csv",  # treat .txt exactly like CSV
-    ".json": "json",
-    ".parquet": "parquet",
-    ".parq": "parquet",
-    ".pq": "parquet",
-    ".xlsx": "excel",
-    # .xls are not supported by DuckDB by default.
-}
-
-# Mapping of file type aliases (both input and output) to their full names.
-FILE_TYPE_ALIASES = {
-    "csv": "csv",
-    "txt": "csv",
-    "parquet": "parquet",
-    "pq": "parquet",
-    "json": "json",
-    "js": "json",
-    "excel": "excel",
-    "ex": "excel",
-}
-
-
-def get_file_type_by_extension(file: Path) -> Optional[str]:
-    """Infer the file type from the file extension."""
-    return ALLOWED_EXT_MAP.get(file.suffix.lower())
-
-
-def prompt_excel_options(file: Path) -> Tuple[Optional[Union[int, str]], Optional[str]]:
-    """
-    Ask the user whether they want to provide Excel options (sheet and/or range).
-
-    Returns:
-        tuple: A tuple (sheet, excel_range) where 'sheet' is either an integer or a string (or None)
-               and 'excel_range' is a string (or None).
-    """
-    sheet: Optional[Union[int, str]] = None
-    excel_range: Optional[str] = None
-    sheet_num: Optional[int] = None
-    sheet_name: Optional[str] = None
-
-    answer = (
-        input(
-            f"For Excel file '{file.name}', would you like to specify a sheet? (y/n): "
-        )
-        .strip()
-        .lower()
-    )
-    if answer.startswith("y"):
-        # Example: entering "1" will be interpreted as sheet number 1 (converted later to "Sheet1")
-        sheet_input = input(
-            "Enter the sheet number (for example, 1 for Sheet1) or sheet name: "
-        ).strip()
-        try:
-            sheet_num = int(sheet_input)
-        except ValueError:
-            sheet_name = sheet_input
-
-    answer = input("Would you like to specify an import range? (y/n): ").strip().lower()
-    if answer.startswith("y"):
-        # Example input: A1:B2
-        excel_range = input("Enter the range (for example, A1:B2): ").strip()
-
-    if sheet_num is not None:
-        sheet = sheet_num
-    elif sheet_name is not None:
-        sheet = sheet_name
-
-    return sheet, excel_range
-
 
 def process_file(
     file: Path,
     in_type: str,
     out_type: str,
-    output_dest: Optional[Path],
+    output_dest: Path,
     conn: duckdb.DuckDBPyConnection,
-    excel_sheet: Optional[Union[int, str]] = None,
-    excel_range: Optional[str] = None,
+    excel_sheet: str = None,
+    excel_range: str = None,
 ) -> None:
     """Process a single file conversion using DuckDB."""
     logging.info(f"Processing file: {file.name}")
@@ -128,7 +62,6 @@ def process_file(
     elif in_type == "parquet":
         relation = conn.from_parquet(str(file.resolve()))
     elif in_type == "excel":
-        # Build the SQL query for reading an Excel file.
         query = f"SELECT * FROM read_xlsx('{file.resolve()}'"
         if excel_sheet is not None:
             # If sheet is an integer, convert to 'Sheet{number}'; otherwise, assume it's a valid name.
@@ -147,7 +80,6 @@ def process_file(
     if output_dest is not None:
         out_path = output_dest
         if out_path.is_dir() or out_path.suffix == "":
-            # Ensure the directory exists.
             out_path.mkdir(parents=True, exist_ok=True)
             if out_type == "csv":
                 output_file = out_path / f"{file.stem}.csv"
@@ -162,7 +94,6 @@ def process_file(
         else:
             output_file = out_path
     else:
-        # No output destination specified.
         if file.is_file():
             if out_type == "csv":
                 output_file = file.with_suffix(".csv")
@@ -175,7 +106,6 @@ def process_file(
             else:
                 raise ValueError(f"Unsupported output file type: {out_type}")
         else:
-            # Default for directory input.
             default_dir = file.parent / "converted"
             default_dir.mkdir(parents=True, exist_ok=True)
             if out_type == "csv":
@@ -195,7 +125,6 @@ def process_file(
     elif out_type == "parquet":
         relation.write_parquet(str(output_file.resolve()))
     elif out_type == "json":
-        # For JSON, use a COPY statement from the query.
         query_str = relation.sql_query()
         conn.execute(f"COPY ({query_str}) TO '{output_file.resolve()}'")
     elif out_type == "excel":
@@ -210,61 +139,13 @@ def process_file(
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Convert between popular data storage file types using DuckDB."
-    )
-    # Update choices to include the new aliases.
-    valid_types = list(FILE_TYPE_ALIASES.keys())
-    parser.add_argument(
-        "input_path",
-        type=str,
-        help="Path to a file or directory containing files.",
-    )
-    parser.add_argument(
-        "-i",
-        "--input-type",
-        type=str,
-        choices=valid_types,
-        default=None,
-        help="Override auto-detection of input file type. (Allowed: csv, txt, json, js, parquet, pq, excel, ex)",
-    )
-    parser.add_argument(
-        "-o",
-        "--output-type",
-        type=str,
-        choices=valid_types,
-        default=None,
-        help="Desired output file type. (Allowed: csv, json, js, parquet, pq, excel, ex)",
-    )
-    parser.add_argument(
-        "-op",
-        "--output-path",
-        type=str,
-        default=None,
-        help="Output file (if input is a single file) or directory (if input is a folder).",
-    )
-    parser.add_argument(
-        "-s",
-        "--sheet",
-        type=str,
-        default=None,
-        help="For Excel input: sheet number or sheet name to import (e.g. 1 or 'Sheet1').",
-    )
-    parser.add_argument(
-        "-c",
-        "--range",
-        type=str,
-        default=None,
-        help="For Excel input: cell range to import (e.g. A1:B2).",
-    )
-
-    args = parser.parse_args()
+    # Use the CLI parser from cli.py
+    args = parse_cli_arguments()
     input_path = Path(args.input_path).resolve()
     output_dest = (
         Path(args.output_path).resolve() if args.output_path is not None else None
     )
 
-    # Determine (or later override) the output type interactively if not passed.
     if args.output_type:
         out_type = FILE_TYPE_ALIASES[args.output_type.lower()]
     else:
@@ -279,10 +160,8 @@ def main():
             logging.error(f"Unsupported output format: {user_output}")
             return
 
-    # Open DuckDB connection in memory.
     with duckdb.connect(database=":memory:") as conn:
         if input_path.is_file():
-            # Determine input type.
             if args.input_type:
                 in_type = FILE_TYPE_ALIASES[args.input_type.lower()]
             else:
@@ -313,7 +192,6 @@ def main():
                 else:
                     in_type = detected
 
-            # For Excel files, if no sheet or range was provided via arguments, prompt the user.
             excel_sheet = args.sheet
             excel_range = args.range
             if in_type == "excel" and (excel_sheet is None and excel_range is None):
@@ -329,15 +207,12 @@ def main():
                 excel_range,
             )
         elif input_path.is_dir():
-            # For directory input, if output destination is not provided, default to a folder
-            # named after the chosen output file type.
             if output_dest is None:
                 output_dest = input_path.parent / out_type
                 output_dest.mkdir(parents=True, exist_ok=True)
                 logging.info(
                     f"Output directory not provided. Using default: {output_dest.resolve()}"
                 )
-            # Process every file in the directory having an allowed extension.
             for file in input_path.iterdir():
                 if file.is_file():
                     detected = get_file_type_by_extension(file)
@@ -346,13 +221,11 @@ def main():
                             f"Skipping file with unsupported extension: {file.name}"
                         )
                         continue
-                    # Use command-line input type if provided; otherwise, use auto-detection.
                     in_type = (
                         FILE_TYPE_ALIASES[args.input_type.lower()]
                         if args.input_type
                         else detected
                     )
-                    # For Excel files, if no global excel options passed, ask interactively once per file.
                     excel_sheet = args.sheet
                     excel_range = args.range
                     if in_type == "excel" and (

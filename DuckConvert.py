@@ -26,9 +26,7 @@ DuckDB reference:
 import logging
 from pathlib import Path
 import duckdb
-
-# Add type annotations for the conversion functions
-from typing import Callable, Any, Dict, Tuple
+from typing import Callable, Any, Dict, Tuple, Optional
 
 from cli_parser import (
     parse_cli_arguments,
@@ -36,6 +34,7 @@ from cli_parser import (
     get_file_type_by_extension,
     prompt_excel_options,
 )
+from path_manager import create_path_manager
 
 # Configure logging
 logging.basicConfig(
@@ -142,12 +141,16 @@ def process_file(
     conn: duckdb.DuckDBPyConnection,
     excel_sheet=None,
     excel_range=None,
+    output_dir: Optional[Path] = None,
 ) -> None:
     """Process a single file conversion using the conversion lookup."""
     logging.info(f"Processing file: {file.name}")
 
-    # Determine output file path (using the same file's directory as default)
-    output_file = file.with_suffix(EXTENSIONS[out_type])
+    # If output_dir is provided, write converted file there; otherwise, use original file's directory.
+    if output_dir is not None:
+        output_file = output_dir / (file.stem + EXTENSIONS[out_type])
+    else:
+        output_file = file.with_suffix(EXTENSIONS[out_type])
 
     conversion_key = (in_type, out_type)
     if conversion_key not in CONVERSION_FUNCTIONS:
@@ -185,6 +188,13 @@ def main():
             return
 
     with duckdb.connect(database=":memory:") as conn:
+        # Install and load the excel extension using the Python API.
+        try:
+            conn.install_extension("excel")
+            conn.load_extension("excel")
+        except Exception as e:
+            logging.error(f"Failed to install/load excel extension: {e}")
+
         if input_path.is_file():
             # Determine input type (CLI override or auto-detect)
             if args.input_type:
@@ -205,6 +215,11 @@ def main():
 
             process_file(input_path, in_type, out_type, conn, excel_sheet, excel_range)
         elif input_path.is_dir():
+            # Create output destination directory using the path manager.
+            pm = create_path_manager(input_path, out_type)
+            output_dest = pm.output_path
+            output_dest.mkdir(parents=True, exist_ok=True)
+
             # Process each file in the directory using the output type alias (-o)
             for file in input_path.iterdir():
                 if file.is_file():
@@ -227,7 +242,13 @@ def main():
                         logging.info(f"For Excel file '{file.name}':")
                         excel_sheet, excel_range = prompt_excel_options(file)
                     process_file(
-                        file, in_type, out_type, conn, excel_sheet, excel_range
+                        file,
+                        in_type,
+                        out_type,
+                        conn,
+                        excel_sheet,
+                        excel_range,
+                        output_dir=output_dest,
                     )
         else:
             logging.error(

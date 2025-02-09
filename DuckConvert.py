@@ -1,12 +1,6 @@
 #!/usr/bin/env python3
-# /// script
-# dependencies = [
-#     "duckdb",
-# ]
-# ///
-
 """
-A conversion tool to convert between popular data storage file types (CSV/TXT, JSON, Parquet, Excel)
+DuckConvert: A conversion tool to convert between popular data storage file types (CSV/TXT, JSON, Parquet, Excel)
 using DuckDB's Python API.
 
 Usage example on the command line (assuming the script is aliased as "conv"):
@@ -14,32 +8,123 @@ Usage example on the command line (assuming the script is aliased as "conv"):
 
 If the input type is not provided, the file extension is used to auto-detect.
 For Excel files, if no sheet or range has been provided through the command line,
-the tool will ask whether you want to enter a sheet number/name or a range.
+the tool will prompt for options.
 
 DuckDB reference:
-- CSV import/export: https://duckdb.org/docs/guides/file_formats/csv_import
-- Excel import/export: https://duckdb.org/docs/guides/file_formats/excel_import
-- JSON import/export: https://duckdb.org/docs/guides/file_formats/json_export
-- Parquet import/export: https://duckdb.org/docs/guides/file_formats/parquet_import
-- Python API reference: https://duckdb.org/docs/api/python/reference/
+- CSV: https://duckdb.org/docs/guides/file_formats/csv_import
+- Excel: https://duckdb.org/docs/guides/file_formats/excel_import
+- JSON: https://duckdb.org/docs/guides/file_formats/json_export
+- Parquet: https://duckdb.org/docs/guides/file_formats/parquet_import
 """
 
 import logging
 from pathlib import Path
 import duckdb
 
-# Import CLI-related functions and constants from cli.py
-from cli import (
-    FILE_TYPE_ALIASES,
+from cli_parser import (
     parse_cli_arguments,
+    FILE_TYPE_ALIASES,
     get_file_type_by_extension,
     prompt_excel_options,
 )
+from path_manager import create_path_manager
 
 # Configure logging
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
+
+# Mapping of output file extensions
+EXTENSIONS = {
+    "csv": ".csv",
+    "parquet": ".parquet",
+    "json": ".json",
+    "excel": ".xlsx",
+}
+
+# Conversion lookup dictionary mapping (input_type, output_type) to conversion lambdas.
+# These lambdas perform the conversion in one chained DuckDB statement.
+CONVERSION_FUNCTIONS = {
+    # CSV conversions
+    ("csv", "parquet"): lambda conn, file, out_file, **kwargs: conn.read_csv(
+        str(file.resolve())
+    ).write_parquet(str(out_file.resolve())),
+    ("csv", "json"): lambda conn, file, out_file, **kwargs: conn.read_csv(
+        str(file.resolve())
+    ).sql(
+        f"COPY (SELECT * FROM read_csv_auto('{file.resolve()}')) TO '{out_file.resolve()}'"
+    ),
+    # JSON conversions
+    ("json", "csv"): lambda conn, file, out_file, **kwargs: conn.read_json(
+        str(file.resolve())
+    ).write_csv(str(out_file.resolve())),
+    ("json", "parquet"): lambda conn, file, out_file, **kwargs: conn.read_json(
+        str(file.resolve())
+    ).write_parquet(str(out_file.resolve())),
+    # Parquet conversions
+    ("parquet", "csv"): lambda conn, file, out_file, **kwargs: conn.from_parquet(
+        str(file.resolve())
+    ).write_csv(str(out_file.resolve())),
+    ("parquet", "json"): lambda conn, file, out_file, **kwargs: conn.from_parquet(
+        str(file.resolve())
+    ).sql(
+        f"COPY (SELECT * FROM read_parquet('{file.resolve()}')) TO '{out_file.resolve()}'"
+    ),
+    # Excel conversions (sheet and range parameters are optional)
+    (
+        "excel",
+        "csv",
+    ): lambda conn, file, out_file, sheet=None, range_=None, **kwargs: conn.sql(
+        "SELECT * FROM read_xlsx('{}'{}{})".format(
+            str(file.resolve()),
+            (
+                ", sheet = '{}'".format(
+                    f"Sheet{sheet}" if isinstance(sheet, int) else sheet
+                )
+                if sheet is not None
+                else ""
+            ),
+            (", range = '{}'".format(range_) if range_ is not None else ""),
+        )
+    ).write_csv(
+        str(out_file.resolve())
+    ),
+    (
+        "excel",
+        "parquet",
+    ): lambda conn, file, out_file, sheet=None, range_=None, **kwargs: conn.sql(
+        "SELECT * FROM read_xlsx('{}'{}{})".format(
+            str(file.resolve()),
+            (
+                ", sheet = '{}'".format(
+                    f"Sheet{sheet}" if isinstance(sheet, int) else sheet
+                )
+                if sheet is not None
+                else ""
+            ),
+            (", range = '{}'".format(range_) if range_ is not None else ""),
+        )
+    ).write_parquet(
+        str(out_file.resolve())
+    ),
+    ("excel", "json"): lambda conn, file, out_file, sheet=None, range_=None, **kwargs: (
+        lambda rel: conn.execute(f"COPY ({rel.sql_query()}) TO '{out_file.resolve()}'")(
+            conn.sql(
+                "SELECT * FROM read_xlsx('{}'{}{})".format(
+                    str(file.resolve()),
+                    (
+                        ", sheet = '{}'".format(
+                            f"Sheet{sheet}" if isinstance(sheet, int) else sheet
+                        )
+                        if sheet is not None
+                        else ""
+                    ),
+                    (", range = '{}'".format(range_) if range_ is not None else ""),
+                )
+            )
+        )
+    ),
+}
 
 
 def process_file(
@@ -48,104 +133,47 @@ def process_file(
     out_type: str,
     output_dest: Path,
     conn: duckdb.DuckDBPyConnection,
-    excel_sheet: str = None,
-    excel_range: str = None,
+    excel_sheet=None,
+    excel_range=None,
 ) -> None:
-    """Process a single file conversion using DuckDB."""
+    """Process a single file conversion using the conversion lookup."""
     logging.info(f"Processing file: {file.name}")
 
-    # Create a relation based on the input type
-    if in_type == "csv":
-        relation = conn.read_csv(str(file.resolve()))
-    elif in_type == "json":
-        relation = conn.read_json(str(file.resolve()))
-    elif in_type == "parquet":
-        relation = conn.from_parquet(str(file.resolve()))
-    elif in_type == "excel":
-        query = f"SELECT * FROM read_xlsx('{file.resolve()}'"
-        if excel_sheet is not None:
-            # If sheet is an integer, convert to 'Sheet{number}'; otherwise, assume it's a valid name.
-            sheet_param = (
-                f"Sheet{excel_sheet}" if isinstance(excel_sheet, int) else excel_sheet
-            )
-            query += f", sheet = '{sheet_param}'"
-        if excel_range is not None:
-            query += f", range = '{excel_range}'"
-        query += ")"
-        relation = conn.sql(query)
-    else:
-        raise ValueError(f"Unsupported input file type: {in_type}")
-
-    # Determine the output file path.
+    # Determine output file path
     if output_dest is not None:
         out_path = output_dest
         if out_path.is_dir() or out_path.suffix == "":
             out_path.mkdir(parents=True, exist_ok=True)
-            if out_type == "csv":
-                output_file = out_path / f"{file.stem}.csv"
-            elif out_type == "parquet":
-                output_file = out_path / f"{file.stem}.parquet"
-            elif out_type == "json":
-                output_file = out_path / f"{file.stem}.json"
-            elif out_type == "excel":
-                output_file = out_path / f"{file.stem}.xlsx"
-            else:
-                raise ValueError(f"Unsupported output file type: {out_type}")
+            output_file = out_path / (file.stem + EXTENSIONS[out_type])
         else:
             output_file = out_path
     else:
-        if file.is_file():
-            if out_type == "csv":
-                output_file = file.with_suffix(".csv")
-            elif out_type == "parquet":
-                output_file = file.with_suffix(".parquet")
-            elif out_type == "json":
-                output_file = file.with_suffix(".json")
-            elif out_type == "excel":
-                output_file = file.with_suffix(".xlsx")
-            else:
-                raise ValueError(f"Unsupported output file type: {out_type}")
-        else:
-            default_dir = file.parent / "converted"
-            default_dir.mkdir(parents=True, exist_ok=True)
-            if out_type == "csv":
-                output_file = default_dir / f"{file.stem}.csv"
-            elif out_type == "parquet":
-                output_file = default_dir / f"{file.stem}.parquet"
-            elif out_type == "json":
-                output_file = default_dir / f"{file.stem}.json"
-            elif out_type == "excel":
-                output_file = default_dir / f"{file.stem}.xlsx"
-            else:
-                raise ValueError(f"Unsupported output file type: {out_type}")
+        # Use the file's own path for output if no output destination provided
+        output_file = file.with_suffix(EXTENSIONS[out_type])
 
-    # Write out based on the desired output type.
-    if out_type == "csv":
-        relation.write_csv(str(output_file.resolve()))
-    elif out_type == "parquet":
-        relation.write_parquet(str(output_file.resolve()))
-    elif out_type == "json":
-        query_str = relation.sql_query()
-        conn.execute(f"COPY ({query_str}) TO '{output_file.resolve()}'")
-    elif out_type == "excel":
-        query_str = relation.sql_query()
-        conn.execute(
-            f"COPY ({query_str}) TO '{output_file.resolve()}' WITH (FORMAT XLSX, HEADER TRUE)"
+    conversion_key = (in_type, out_type)
+    if conversion_key not in CONVERSION_FUNCTIONS:
+        raise ValueError(f"Unsupported conversion: {in_type} to {out_type}")
+
+    # For Excel input, pass the sheet and range parameters
+    if in_type == "excel":
+        CONVERSION_FUNCTIONS[conversion_key](
+            conn, file, output_file, sheet=excel_sheet, range_=excel_range
         )
     else:
-        raise ValueError(f"Unsupported output file type: {out_type}")
+        CONVERSION_FUNCTIONS[conversion_key](conn, file, output_file)
 
     logging.info(f"Written {out_type} file: {output_file.resolve()}")
 
 
 def main():
-    # Use the CLI parser from cli.py
     args = parse_cli_arguments()
     input_path = Path(args.input_path).resolve()
     output_dest = (
         Path(args.output_path).resolve() if args.output_path is not None else None
     )
 
+    # Determine desired output type
     if args.output_type:
         out_type = FILE_TYPE_ALIASES[args.output_type.lower()]
     else:
@@ -162,6 +190,7 @@ def main():
 
     with duckdb.connect(database=":memory:") as conn:
         if input_path.is_file():
+            # Determine input type (CLI override or auto-detect)
             if args.input_type:
                 in_type = FILE_TYPE_ALIASES[args.input_type.lower()]
             else:
@@ -171,8 +200,7 @@ def main():
                         f"Could not automatically detect file type for {input_path}"
                     )
                     return
-                else:
-                    in_type = detected
+                in_type = detected
 
             excel_sheet = args.sheet
             excel_range = args.range
@@ -189,8 +217,10 @@ def main():
                 excel_range,
             )
         elif input_path.is_dir():
+            # If no output destination is provided, use the DirectoryPathManager to generate one.
             if output_dest is None:
-                output_dest = input_path.parent / out_type
+                pm = create_path_manager(input_path, out_type)
+                output_dest = pm.output_path
                 output_dest.mkdir(parents=True, exist_ok=True)
                 logging.info(
                     f"Output directory not provided. Using default: {output_dest.resolve()}"

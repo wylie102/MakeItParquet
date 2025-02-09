@@ -4,13 +4,13 @@ Module for managing file and directory paths for file conversions.
 
 This module defines classes to:
     - Detect if a given path is a file or a directory.
-    - Infer the file type (both for processing and for naming) from the file extension.
+    - Infer the file type (for processing and for naming) from the file extension.
     - Generate an output file path (by changing the extension) or output directory name
       (by replacing the file‐type “alias” in the directory name) while preserving
       common capitalization conventions.
 
 Special handling is provided for .txt files: they are processed like CSV files,
-but when naming directories the literal “txt” is used.
+but when naming directories the literal "txt" is used.
 """
 
 import re
@@ -57,7 +57,6 @@ class BasePathManager:
     def _replace_alias_in_string(text: str, old_alias: str, new_alias: str) -> str:
         """
         Replace all occurrences of old_alias in text with new_alias while preserving capitalization.
-
         If no occurrence is found, appends the new alias to the text.
         """
         pattern = re.compile(re.escape(old_alias), re.IGNORECASE)
@@ -83,7 +82,7 @@ class FilePathManager(BasePathManager):
     """
     Class for managing file paths.
 
-    For files the output path is simply created by changing the file extension.
+    For files, the output path is created by changing the file extension.
     """
 
     def __init__(self, input_path: Path, output_ext: str):
@@ -118,7 +117,6 @@ class DirectoryPathManager(BasePathManager):
     def _infer_majority_alias(self) -> Optional[str]:
         """
         Infer the majority file-type alias for naming from files in the directory using NAMING_EXT_MAP.
-
         Returns:
             The most common alias (e.g., 'csv' or 'txt') or None if no valid files are found.
         """
@@ -140,7 +138,6 @@ class DirectoryPathManager(BasePathManager):
     def _generate_output_name(self) -> str:
         """
         Generate the output directory name by replacing the input alias with the output extension.
-
         Uses the helper method _replace_alias_in_string to preserve capitalization.
         """
         if self.input_alias:

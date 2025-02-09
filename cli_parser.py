@@ -15,16 +15,19 @@ import argparse
 from pathlib import Path
 from typing import Optional, Dict
 
-# Mapping for file type aliases. Note that .txt is processed as csv.
+# Mapping for file type aliases.
 FILE_TYPE_ALIASES = {
     "csv": "csv",
-    "txt": "csv",  # treat txt as csv for processing
+    "txt": "csv",  # Process .txt as CSV.
+    "tsv": "csv",  # Process .tsv as CSV.
     "json": "json",
+    "js": "json",  # Added alias for JSON.
     "parquet": "parquet",
     "parq": "parquet",
     "pq": "parquet",
     "excel": "excel",
     "xlsx": "excel",
+    "ex": "excel",  # Added alias "ex" for Excel.
 }
 
 
@@ -71,6 +74,7 @@ def get_file_type_by_extension(path: Path) -> Optional[str]:
     extension_map: Dict[str, str] = {
         ".csv": "csv",
         ".txt": "csv",
+        ".tsv": "csv",  # Added for TSV files.
         ".json": "json",
         ".parquet": "parquet",
         ".parq": "parquet",

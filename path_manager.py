@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+# /// script
+# dependencies = [
+#     "duckdb",
+# ]
+# ///
+
 """
 Module for managing file and directory paths for file conversions.
 
@@ -6,7 +12,7 @@ This module defines classes to:
     - Detect if a given path is a file or a directory.
     - Infer the file type (for processing and for naming) from the file extension.
     - Generate an output file path (by changing the extension) or output directory name
-      (by replacing the file‐type “alias” in the directory name) while preserving
+      (by replacing the file‐type "alias" in the directory name) while preserving
       common capitalization conventions.
 
 Special handling is provided for .txt files: they are processed like CSV files,

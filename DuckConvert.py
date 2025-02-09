@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+# /// script
+# dependencies = [
+#     "duckdb",
+# ]
+# ///
+
 """
 DuckConvert: A conversion tool to convert between popular data storage file types (CSV/TXT, JSON, Parquet, Excel)
 using DuckDB's Python API.
@@ -21,13 +27,15 @@ import logging
 from pathlib import Path
 import duckdb
 
+# Add type annotations for the conversion functions
+from typing import Callable, Any, Dict, Tuple
+
 from cli_parser import (
     parse_cli_arguments,
     FILE_TYPE_ALIASES,
     get_file_type_by_extension,
     prompt_excel_options,
 )
-from path_manager import create_path_manager
 
 # Configure logging
 logging.basicConfig(
@@ -43,8 +51,8 @@ EXTENSIONS = {
 }
 
 # Conversion lookup dictionary mapping (input_type, output_type) to conversion lambdas.
-# These lambdas perform the conversion in one chained DuckDB statement.
-CONVERSION_FUNCTIONS = {
+# The type annotation tells the linter each value is a callable.
+CONVERSION_FUNCTIONS: Dict[Tuple[str, str], Callable[..., Any]] = {
     # CSV conversions
     ("csv", "parquet"): lambda conn, file, out_file, **kwargs: conn.read_csv(
         str(file.resolve())
@@ -131,7 +139,6 @@ def process_file(
     file: Path,
     in_type: str,
     out_type: str,
-    output_dest: Path,
     conn: duckdb.DuckDBPyConnection,
     excel_sheet=None,
     excel_range=None,
@@ -139,17 +146,8 @@ def process_file(
     """Process a single file conversion using the conversion lookup."""
     logging.info(f"Processing file: {file.name}")
 
-    # Determine output file path
-    if output_dest is not None:
-        out_path = output_dest
-        if out_path.is_dir() or out_path.suffix == "":
-            out_path.mkdir(parents=True, exist_ok=True)
-            output_file = out_path / (file.stem + EXTENSIONS[out_type])
-        else:
-            output_file = out_path
-    else:
-        # Use the file's own path for output if no output destination provided
-        output_file = file.with_suffix(EXTENSIONS[out_type])
+    # Determine output file path (using the same file's directory as default)
+    output_file = file.with_suffix(EXTENSIONS[out_type])
 
     conversion_key = (in_type, out_type)
     if conversion_key not in CONVERSION_FUNCTIONS:
@@ -169,14 +167,12 @@ def process_file(
 def main():
     args = parse_cli_arguments()
     input_path = Path(args.input_path).resolve()
-    output_dest = (
-        Path(args.output_path).resolve() if args.output_path is not None else None
-    )
 
-    # Determine desired output type
+    # The -o option is now used as the output type alias (e.g., "pq" for parquet)
     if args.output_type:
         out_type = FILE_TYPE_ALIASES[args.output_type.lower()]
     else:
+        # If not provided via -o, prompt the user.
         user_output = (
             input("Enter desired output format (csv, parquet, json, excel): ")
             .strip()
@@ -207,24 +203,9 @@ def main():
             if in_type == "excel" and (excel_sheet is None and excel_range is None):
                 excel_sheet, excel_range = prompt_excel_options(input_path)
 
-            process_file(
-                input_path,
-                in_type,
-                out_type,
-                output_dest,
-                conn,
-                excel_sheet,
-                excel_range,
-            )
+            process_file(input_path, in_type, out_type, conn, excel_sheet, excel_range)
         elif input_path.is_dir():
-            # If no output destination is provided, use the DirectoryPathManager to generate one.
-            if output_dest is None:
-                pm = create_path_manager(input_path, out_type)
-                output_dest = pm.output_path
-                output_dest.mkdir(parents=True, exist_ok=True)
-                logging.info(
-                    f"Output directory not provided. Using default: {output_dest.resolve()}"
-                )
+            # Process each file in the directory using the output type alias (-o)
             for file in input_path.iterdir():
                 if file.is_file():
                     detected = get_file_type_by_extension(file)
@@ -246,13 +227,7 @@ def main():
                         logging.info(f"For Excel file '{file.name}':")
                         excel_sheet, excel_range = prompt_excel_options(file)
                     process_file(
-                        file,
-                        in_type,
-                        out_type,
-                        output_dest,
-                        conn,
-                        excel_sheet,
-                        excel_range,
+                        file, in_type, out_type, conn, excel_sheet, excel_range
                     )
         else:
             logging.error(

@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+# /// script
+# dependencies = [
+#     "duckdb",
+# ]
+# ///
+
 """
 CLI Parser module for DuckConvert.
 
@@ -7,6 +13,7 @@ Provides command-line argument parsing and helper functions.
 
 import argparse
 from pathlib import Path
+from typing import Optional, Dict
 
 # Mapping for file type aliases. Note that .txt is processed as csv.
 FILE_TYPE_ALIASES = {
@@ -29,20 +36,14 @@ def parse_cli_arguments():
     parser.add_argument("input_path", help="Path to the input file or directory.")
     parser.add_argument(
         "-o",
-        "--output_path",
-        help="Path to the output file or directory.",
+        "--output_type",
+        help="Output file type (csv, parquet, json, excel).",
         default=None,
     )
     parser.add_argument(
         "-i",
         "--input_type",
         help="Input file type (csv, json, parquet, excel).",
-        default=None,
-    )
-    parser.add_argument(
-        "-t",
-        "--output_type",
-        help="Output file type (csv, parquet, json, excel).",
         default=None,
     )
     parser.add_argument(
@@ -60,14 +61,23 @@ def parse_cli_arguments():
     return parser.parse_args()
 
 
-def get_file_type_by_extension(file_path: Path) -> str:
+def get_file_type_by_extension(path: Path) -> Optional[str]:
     """
     Determine file type based on file extension.
 
     Returns the canonical file type (e.g., 'csv', 'json', etc.) or None if unsupported.
     """
-    ext = file_path.suffix.lower().lstrip(".")
-    return FILE_TYPE_ALIASES.get(ext, None)
+    ext = path.suffix.lower()
+    extension_map: Dict[str, str] = {
+        ".csv": "csv",
+        ".txt": "csv",
+        ".json": "json",
+        ".parquet": "parquet",
+        ".parq": "parquet",
+        ".pq": "parquet",
+        ".xlsx": "excel",
+    }
+    return extension_map.get(ext)
 
 
 def prompt_excel_options(file_path: Path):

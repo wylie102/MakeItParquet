@@ -1,4 +1,4 @@
-# DuckConverter
+# DuckConvert
 
 A conversion tool to convert between popular data storage file types (CSV/TXT/TSV, JSON, Parquet, Excel) using DuckDB's Python API.
 

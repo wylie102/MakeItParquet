@@ -26,7 +26,7 @@ DuckDB reference:
 import logging
 from pathlib import Path
 import duckdb
-from typing import Callable, Any, Dict, Tuple, Optional
+from typing import Optional
 
 from cli_parser import (
     parse_cli_arguments,
@@ -35,6 +35,7 @@ from cli_parser import (
     prompt_excel_options,
 )
 from path_manager import create_path_manager
+from conversions import CONVERSION_FUNCTIONS
 
 # Configure logging
 logging.basicConfig(
@@ -47,90 +48,6 @@ EXTENSIONS = {
     "parquet": ".parquet",
     "json": ".json",
     "excel": ".xlsx",
-}
-
-# Conversion lookup dictionary mapping (input_type, output_type) to conversion lambdas.
-# The type annotation tells the linter each value is a callable.
-CONVERSION_FUNCTIONS: Dict[Tuple[str, str], Callable[..., Any]] = {
-    # CSV conversions
-    ("csv", "parquet"): lambda conn, file, out_file, **kwargs: conn.read_csv(
-        str(file.resolve())
-    ).write_parquet(str(out_file.resolve())),
-    ("csv", "json"): lambda conn, file, out_file, **kwargs: conn.read_csv(
-        str(file.resolve())
-    ).sql(
-        f"COPY (SELECT * FROM read_csv_auto('{file.resolve()}')) TO '{out_file.resolve()}'"
-    ),
-    # JSON conversions
-    ("json", "csv"): lambda conn, file, out_file, **kwargs: conn.read_json(
-        str(file.resolve())
-    ).write_csv(str(out_file.resolve())),
-    ("json", "parquet"): lambda conn, file, out_file, **kwargs: conn.read_json(
-        str(file.resolve())
-    ).write_parquet(str(out_file.resolve())),
-    # Parquet conversions
-    ("parquet", "csv"): lambda conn, file, out_file, **kwargs: conn.from_parquet(
-        str(file.resolve())
-    ).write_csv(str(out_file.resolve())),
-    ("parquet", "json"): lambda conn, file, out_file, **kwargs: conn.from_parquet(
-        str(file.resolve())
-    ).sql(
-        f"COPY (SELECT * FROM read_parquet('{file.resolve()}')) TO '{out_file.resolve()}'"
-    ),
-    # Excel conversions (sheet and range parameters are optional)
-    (
-        "excel",
-        "csv",
-    ): lambda conn, file, out_file, sheet=None, range_=None, **kwargs: conn.sql(
-        "SELECT * FROM read_xlsx('{}'{}{})".format(
-            str(file.resolve()),
-            (
-                ", sheet = '{}'".format(
-                    f"Sheet{sheet}" if isinstance(sheet, int) else sheet
-                )
-                if sheet is not None
-                else ""
-            ),
-            (", range = '{}'".format(range_) if range_ is not None else ""),
-        )
-    ).write_csv(
-        str(out_file.resolve())
-    ),
-    (
-        "excel",
-        "parquet",
-    ): lambda conn, file, out_file, sheet=None, range_=None, **kwargs: conn.sql(
-        "SELECT * FROM read_xlsx('{}'{}{})".format(
-            str(file.resolve()),
-            (
-                ", sheet = '{}'".format(
-                    f"Sheet{sheet}" if isinstance(sheet, int) else sheet
-                )
-                if sheet is not None
-                else ""
-            ),
-            (", range = '{}'".format(range_) if range_ is not None else ""),
-        )
-    ).write_parquet(
-        str(out_file.resolve())
-    ),
-    ("excel", "json"): lambda conn, file, out_file, sheet=None, range_=None, **kwargs: (
-        lambda rel: conn.execute(f"COPY ({rel.sql_query()}) TO '{out_file.resolve()}'")(
-            conn.sql(
-                "SELECT * FROM read_xlsx('{}'{}{})".format(
-                    str(file.resolve()),
-                    (
-                        ", sheet = '{}'".format(
-                            f"Sheet{sheet}" if isinstance(sheet, int) else sheet
-                        )
-                        if sheet is not None
-                        else ""
-                    ),
-                    (", range = '{}'".format(range_) if range_ is not None else ""),
-                )
-            )
-        )
-    ),
 }
 
 
@@ -146,25 +63,38 @@ def process_file(
     """Process a single file conversion using the conversion lookup."""
     logging.info(f"Processing file: {file.name}")
 
-    # If output_dir is provided, write converted file there; otherwise, use original file's directory.
+    # Determine output file
     if output_dir is not None:
         output_file = output_dir / (file.stem + EXTENSIONS[out_type])
     else:
         output_file = file.with_suffix(EXTENSIONS[out_type])
 
+    # Ensure we do not overwrite an existing file.
+    if output_file.exists():
+        base = output_file.stem
+        ext = output_file.suffix
+        counter = 1
+        candidate = output_file.parent / f"{base}_{counter}{ext}"
+        while candidate.exists():
+            counter += 1
+            candidate = output_file.parent / f"{base}_{counter}{ext}"
+        output_file = candidate
+
     conversion_key = (in_type, out_type)
     if conversion_key not in CONVERSION_FUNCTIONS:
         raise ValueError(f"Unsupported conversion: {in_type} to {out_type}")
 
-    # For Excel input, pass the sheet and range parameters
-    if in_type == "excel":
-        CONVERSION_FUNCTIONS[conversion_key](
-            conn, file, output_file, sheet=excel_sheet, range_=excel_range
-        )
-    else:
-        CONVERSION_FUNCTIONS[conversion_key](conn, file, output_file)
-
-    logging.info(f"Written {out_type} file: {output_file.resolve()}")
+    try:
+        # Use appropriate conversion function (passing sheet/range for Excel input)
+        if in_type == "excel":
+            CONVERSION_FUNCTIONS[conversion_key](
+                conn, file, output_file, sheet=excel_sheet, range_=excel_range
+            )
+        else:
+            CONVERSION_FUNCTIONS[conversion_key](conn, file, output_file)
+        logging.info(f"Written {out_type} file: {output_file.resolve()}")
+    except Exception as e:
+        logging.error(f"Error processing file {file.name}: {e}")
 
 
 def main():

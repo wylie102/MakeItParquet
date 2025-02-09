@@ -61,6 +61,12 @@ def parse_cli_arguments():
         help="Excel cell range (for Excel input, e.g., A1:D100).",
         default=None,
     )
+    parser.add_argument(
+        "-d",
+        "--delimiter",
+        help="Delimiter to use for TXT export (use 't' for tab, 'c' for comma or provide a literal value)",
+        default=None,
+    )
     return parser.parse_args()
 
 

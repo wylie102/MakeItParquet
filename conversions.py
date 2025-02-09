@@ -92,15 +92,13 @@ def export_txt_generic(
     if delimiter is None:
         answer = (
             input(
-                "For TXT export, choose T for tab separated or C for comma separated: "
+                "For TXT export, choose t for tab separated or c for comma separated: "
             )
             .strip()
             .lower()
         )
         delimiter = "\t" if answer == "t" else ","
-    read_func(str(file.resolve())).write_csv(
-        str(out_file.resolve()), delimiter=delimiter
-    )
+    read_func(str(file.resolve())).write_csv(str(out_file.resolve()), sep=delimiter)
 
 
 def export_tsv_generic(
@@ -114,7 +112,7 @@ def export_tsv_generic(
     Generic exporter for TSV files.
     Uses tab as the delimiter.
     """
-    read_func(str(file.resolve())).write_csv(str(out_file.resolve()), delimiter="\t")
+    read_func(str(file.resolve())).write_csv(str(out_file.resolve()), sep="\t")
 
 
 # Conversion lookup dictionary mapping (input_type, output_type) to conversion lambdas.
@@ -242,32 +240,34 @@ CONVERSION_FUNCTIONS: Dict[Tuple[str, str], Callable[..., Any]] = {
             (", range = '{}'".format(range_) if range_ is not None else ""),
         )
     ).write_csv(
-        str(out_file.resolve()), delimiter="\t"
+        str(out_file.resolve()), sep="\t"
     ),
     ("excel", "txt"): lambda conn, file, out_file, sheet=None, range_=None, **kwargs: (
-        (
-            lambda dt: conn.sql(
-                "SELECT * FROM read_xlsx('{}'{}{})".format(
-                    str(file.resolve()),
-                    (
-                        ", sheet = '{}'".format(
-                            f"Sheet{sheet}" if isinstance(sheet, int) else sheet
-                        )
-                        if sheet is not None
-                        else ""
-                    ),
-                    (", range = '{}'".format(range_) if range_ is not None else ""),
-                )
-            ).write_csv(str(out_file.resolve()), delimiter=dt)
-        )(
-            input(
-                "For TXT export, choose T for tab separated or C for comma separated: "
+        lambda dt: conn.sql(
+            "SELECT * FROM read_xlsx('{}'{}{})".format(
+                str(file.resolve()),
+                (
+                    ", sheet = '{}'".format(
+                        f"Sheet{sheet}" if isinstance(sheet, int) else sheet
+                    )
+                    if sheet is not None
+                    else ""
+                ),
+                (", range = '{}'".format(range_) if range_ is not None else ""),
+            )
+        ).write_csv(str(out_file.resolve()), sep=dt)
+    )(
+        kwargs.get("delimiter")
+        if kwargs.get("delimiter") is not None
+        else (
+            "\t"
+            if input(
+                "For TXT export, choose t for tab separated or c for comma separated: "
             )
             .strip()
             .lower()
             == "t"
-            and "\t"
-            or ","
+            else ","
         )
     ),
 }

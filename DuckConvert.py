@@ -45,6 +45,8 @@ logging.basicConfig(
 # Mapping of output file extensions
 EXTENSIONS = {
     "csv": ".csv",
+    "tsv": ".tsv",
+    "txt": ".txt",
     "parquet": ".parquet",
     "json": ".json",
     "excel": ".xlsx",
@@ -59,6 +61,7 @@ def process_file(
     excel_sheet=None,
     excel_range=None,
     output_dir: Optional[Path] = None,
+    **kwargs,  # Accept extra keyword arguments
 ) -> None:
     """Process a single file conversion using the conversion lookup."""
     logging.info(f"Processing file: {file.name}")
@@ -88,10 +91,10 @@ def process_file(
         # Use appropriate conversion function (passing sheet/range for Excel input)
         if in_type == "excel":
             CONVERSION_FUNCTIONS[conversion_key](
-                conn, file, output_file, sheet=excel_sheet, range_=excel_range
+                conn, file, output_file, sheet=excel_sheet, range_=excel_range, **kwargs
             )
         else:
-            CONVERSION_FUNCTIONS[conversion_key](conn, file, output_file)
+            CONVERSION_FUNCTIONS[conversion_key](conn, file, output_file, **kwargs)
         logging.info(f"Written {out_type} file: {output_file.resolve()}")
     except Exception as e:
         logging.error(f"Error processing file {file.name}: {e}")
@@ -101,21 +104,32 @@ def main():
     args = parse_cli_arguments()
     input_path = Path(args.input_path).resolve()
 
-    # The -o option is now used as the output type alias (e.g., "pq" for parquet)
+    # The -o option is now used as the output type alias (e.g., "pq" for parquet, "tsv" for TSV)
     if args.output_type:
-        out_type = FILE_TYPE_ALIASES[args.output_type.lower()]
+        out_lower = args.output_type.lower()
+        if out_lower in ["tsv", "txt"]:
+            out_type = out_lower
+        else:
+            try:
+                out_type = FILE_TYPE_ALIASES[out_lower]
+            except KeyError:
+                logging.error(f"Unsupported output format: {args.output_type}")
+                return
     else:
         # If not provided via -o, prompt the user.
         user_output = (
-            input("Enter desired output format (csv, parquet, json, excel): ")
+            input("Enter desired output format (csv, parquet, json, excel, tsv, txt): ")
             .strip()
             .lower()
         )
-        try:
-            out_type = FILE_TYPE_ALIASES[user_output]
-        except KeyError:
-            logging.error(f"Unsupported output format: {user_output}")
-            return
+        if user_output in ["tsv", "txt"]:
+            out_type = user_output
+        else:
+            try:
+                out_type = FILE_TYPE_ALIASES[user_output]
+            except KeyError:
+                logging.error(f"Unsupported output format: {user_output}")
+                return
 
     with duckdb.connect(database=":memory:") as conn:
         # Install and load the excel extension using the Python API.
@@ -124,6 +138,28 @@ def main():
             conn.load_extension("excel")
         except Exception as e:
             logging.error(f"Failed to install/load excel extension: {e}")
+
+        # --- NEW: Get delimiter for TXT export from CLI or prompt once ---
+        extra_kwargs = {}
+        if out_type == "txt":
+            if args.delimiter is not None:
+                d = args.delimiter.strip().lower()
+                if d == "t":
+                    extra_kwargs["delimiter"] = "\t"
+                elif d == "c":
+                    extra_kwargs["delimiter"] = ","
+                else:
+                    extra_kwargs["delimiter"] = args.delimiter
+            else:
+                answer = (
+                    input(
+                        "For TXT export, choose t for tab separated or c for comma separated: "
+                    )
+                    .strip()
+                    .lower()
+                )
+                extra_kwargs["delimiter"] = "\t" if answer == "t" else ","
+        # --- END NEW ---
 
         if input_path.is_file():
             # Determine input type (CLI override or auto-detect)
@@ -143,7 +179,15 @@ def main():
             if in_type == "excel" and (excel_sheet is None and excel_range is None):
                 excel_sheet, excel_range = prompt_excel_options(input_path)
 
-            process_file(input_path, in_type, out_type, conn, excel_sheet, excel_range)
+            process_file(
+                input_path,
+                in_type,
+                out_type,
+                conn,
+                excel_sheet,
+                excel_range,
+                **extra_kwargs,
+            )
         elif input_path.is_dir():
             # Create output destination directory using the path manager.
             pm = create_path_manager(input_path, out_type)
@@ -179,6 +223,7 @@ def main():
                         excel_sheet,
                         excel_range,
                         output_dir=output_dest,
+                        **extra_kwargs,
                     )
         else:
             logging.error(

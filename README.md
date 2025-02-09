@@ -1,3 +1,4 @@
+![DuckConvert Logo](https://github.com/user-attachments/assets/73141b55-e8ab-4739-8c58-6bfe302ed442)
 # DuckConvert
 
 A conversion tool to convert between popular data storage file types (CSV/TXT/TSV, JSON, Parquet, Excel) using DuckDB's Python API.
@@ -15,11 +16,7 @@ A conversion tool to convert between popular data storage file types (CSV/TXT/TS
 - Python 3.7+
 - [DuckDB Python package](https://duckdb.org/docs/api/python/reference/)
 
-Install DuckDB via pip:
-
-```bash
-pip install duckdb
-```
+Note: DuckDB is not yet available via pip. Please refer to the [official DuckDB documentation](https://duckdb.org/docs) for installation instructions or build it from source.
 
 ## Running the Script
 
@@ -31,6 +28,8 @@ uv run /path/to/duckconverter.py [OPTIONS]
 
 ## Usage
 
+The basic usage from the command line is as follows:
+
 ```bash
 Usage: dc <input_path> [OPTIONS]
 
@@ -38,9 +37,9 @@ Arguments:
   input_path              Path to a file or directory containing files.
 
 Options:
-  -i, --input-type TEXT   Override auto-detection of input file type.
+  -i, --input_type TEXT   Override auto-detection of input file type.
                           Allowed values: csv, txt, tsv, json, parquet, pq, excel, ex.
-  -o, --output-type TEXT  Desired output file type.
+  -o, --output_type TEXT  Desired output file type.
                           Allowed values: csv, tsv, json, parquet, pq, excel, ex.
   -op, --output-path TEXT
                           Output file (if input is a single file) or directory
@@ -48,6 +47,7 @@ Options:
                           named after the output type is always created.
   -s, --sheet TEXT        For Excel input: sheet number or sheet name to import (e.g. 1 or "Sheet1").
   -c, --range TEXT        For Excel input: cell range to import (e.g. A1:B2).
+  -d, --delimiter TEXT    Defines the delimiter for TXT export. Pass 't' for tab-separated, 'c' for comma-separated, or provide a literal value. If not provided, the tool will prompt you.
 ```
 
 ## Examples
@@ -74,6 +74,18 @@ Options:
 
   ```bash
   mip /path/to/file_or_folder
+  ```
+
+- **Convert a CSV File to JSON (auto-detecting the input type):**
+
+  ```bash
+  dc /path/to/file.csv -o json
+  ```
+
+- **Convert all Supported Files in a Directory to TXT Format and Specify a Delimiter for TXT Export:**
+
+  ```bash
+  dc /path/to/folder -o txt -d t
   ```
 
 ## Shell Configuration
@@ -130,12 +142,34 @@ Then reload your configuration:
 source ~/.config/fish/config.fish
 ```
 
-## Credits and Acknowledgements
+## How It Works
 
-- **DuckDB:** This tool leverages the [DuckDB Python API](https://duckdb.org/docs/api/python/reference/) for efficient data conversion. Please refer to DuckDB’s documentation for more details.
-- **Contributors:** This project was developed with community contributions in mind. Feel free to submit issues or pull requests.
+1. **Input Processing:**  
+   - If the input path is a file, DuckConvert will convert the file to the specified output format by simply changing the extension.
+   - If the input is a directory, it will scan the folder to determine the majority file type (using predefined naming mappings) and generate an output directory name accordingly.
 
-## License
+2. **File Conversions:**  
+   - Conversion functions, defined in the tool's `conversions.py` module, handle the actual file format conversions using DuckDB SQL commands.
+   - For Excel conversions, if the number of rows exceeds an effective limit, the export is paginated into multiple files.
 
-This project is licensed under the MIT License. See the LICENSE section below for details.
+3. **CLI Options:**  
+   - Input and output types can be overridden by CLI options (`-i` and `-o`).
+   - For Excel inputs, `-s` and `-c` allow you to specify the sheet and cell range.
+   - For TXT exports, use the `-d` option to select the delimiter (or the tool will prompt if not supplied).
+
+## Dependencies
+
+- Python 3.6+
+- [DuckDB](https://duckdb.org)
+
+## Licence
+
+Distributed under the MIT Licence. See `LICENSE` for more information.
+
+## Acknowledgements
+
+- Thanks to DuckDB for providing a robust SQL engine for on-the-fly file conversions.
+- Special thanks to contributors and users who helped refine DuckConvert.
+
+Happy converting!
 

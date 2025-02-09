@@ -45,6 +45,7 @@ class BasePathManager:
     NAMING_EXT_MAP: Dict[str, str] = {
         ".csv": "csv",
         ".txt": "txt",  # naming: keep txt as txt
+        ".tsv": "tsv",  # added mapping for TSV files
         ".json": "json",
         ".parquet": "parquet",
         ".parq": "parquet",

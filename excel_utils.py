@@ -111,9 +111,43 @@ def export_excel(
         )
         return
 
-    logging.warning(
-        f"Row count {row_count} exceeds effective limit {effective_limit}. Pagination not implemented; exporting entire result."
+    parts = (row_count + effective_limit - 1) // effective_limit
+    logging.info(
+        f"Excel export: {row_count} rows exceed the effective limit of {effective_limit}. "
+        f"Splitting into {parts} parts labelled as '{out_file.stem}_1' to '{out_file.stem}_{parts}'."
     )
-    conn.sql(
-        f"COPY ({base_query}) TO '{out_file_path}' WITH (FORMAT 'xlsx', header 'true')"
-    )
+
+    for part in range(parts):
+        offset = part * effective_limit
+        part_query = f"{base_query} LIMIT {effective_limit} OFFSET {offset}"
+
+        # Verify the row count for this batch.
+        verify_query = f"SELECT COUNT(*) FROM ({part_query}) AS t"
+        result = conn.execute(verify_query).fetchone()
+        if result is None:
+            raise ValueError("No result returned from count query")
+        part_count = result[0]
+        if part_count > effective_limit:
+            raise ValueError(
+                f"Part {part+1} exceeds effective limit ({part_count} > {effective_limit})"
+            )
+        if part_count == 0:
+            break
+
+        logging.info(
+            f"Exporting part {part+1} with {part_count} rows (offset {offset})."
+        )
+
+        # Generate a unique file name for this partition.
+        out_file_part = out_file.parent / f"{out_file.stem}_{part+1}{out_file.suffix}"
+        unique_out_file = out_file_part
+        counter = 1
+        while unique_out_file.exists():
+            unique_out_file = (
+                out_file.parent / f"{out_file.stem}_{part+1}_{counter}{out_file.suffix}"
+            )
+            counter += 1
+
+        conn.sql(
+            f"COPY ({part_query}) TO '{unique_out_file.resolve()}' WITH (FORMAT 'xlsx', header 'true')"
+        )

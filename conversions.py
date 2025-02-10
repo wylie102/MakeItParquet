@@ -10,6 +10,7 @@ It also leverages the Excel extension when needed.
 from typing import Callable, Any, Dict, Tuple
 from pathlib import Path
 import duckdb
+import logging
 
 
 def export_excel(
@@ -17,7 +18,7 @@ def export_excel(
     base_query: str,
     out_file: Path,
     row_limit: int = 1048576,
-    margin: int = 100,  # Extra breathing room for header row etc.
+    margin: int = 100,  # Breathing room for header row etc.
 ) -> None:
     """
     Export query results to an Excel file.
@@ -44,6 +45,11 @@ def export_excel(
 
     # Paginate the export if row_count exceeds the effective limit.
     parts = (row_count + effective_limit - 1) // effective_limit
+    logging.info(
+        f"Excel export: {row_count} rows exceed the effective limit of {effective_limit}. "
+        f"Splitting into {parts} parts labelled as '{out_file.stem}_1' to '{out_file.stem}_{parts}'."
+    )
+
     for part in range(parts):
         offset = part * effective_limit
         part_query = f"{base_query} LIMIT {effective_limit} OFFSET {offset}"
@@ -60,6 +66,10 @@ def export_excel(
             )
         if part_count == 0:
             break
+
+        logging.info(
+            f"Exporting part {part+1} with {part_count} rows (offset {offset})."
+        )
 
         # Generate a unique file name for this partition.
         out_file_part = out_file.parent / f"{out_file.stem}_{part+1}{out_file.suffix}"
@@ -175,7 +185,7 @@ CONVERSION_FUNCTIONS: Dict[Tuple[str, str], Callable[..., Any]] = {
         "excel",
         "csv",
     ): lambda conn, file, out_file, sheet=None, range_=None, **kwargs: conn.sql(
-        "SELECT * FROM read_xlsx('{}'{}{})".format(
+        "SELECT * FROM read_xlsx('{}', all_varchar = 'true'{}{})".format(
             str(file.resolve()),
             (
                 ", sheet = '{}'".format(
@@ -193,7 +203,7 @@ CONVERSION_FUNCTIONS: Dict[Tuple[str, str], Callable[..., Any]] = {
         "excel",
         "parquet",
     ): lambda conn, file, out_file, sheet=None, range_=None, **kwargs: conn.sql(
-        "SELECT * FROM read_xlsx('{}'{}{})".format(
+        "SELECT * FROM read_xlsx('{}', all_varchar = 'true'{}{})".format(
             str(file.resolve()),
             (
                 ", sheet = '{}'".format(
@@ -211,7 +221,7 @@ CONVERSION_FUNCTIONS: Dict[Tuple[str, str], Callable[..., Any]] = {
         lambda rel: conn.execute(f"COPY ({rel.sql_query()}) TO '{out_file.resolve()}'")
     )(
         conn.sql(
-            "SELECT * FROM read_xlsx('{}'{}{})".format(
+            "SELECT * FROM read_xlsx('{}', all_varchar = 'true'{}{})".format(
                 str(file.resolve()),
                 (
                     ", sheet = '{}'".format(
@@ -228,7 +238,7 @@ CONVERSION_FUNCTIONS: Dict[Tuple[str, str], Callable[..., Any]] = {
         "excel",
         "tsv",
     ): lambda conn, file, out_file, sheet=None, range_=None, **kwargs: conn.sql(
-        "SELECT * FROM read_xlsx('{}'{}{})".format(
+        "SELECT * FROM read_xlsx('{}', all_varchar = 'true'{}{})".format(
             str(file.resolve()),
             (
                 ", sheet = '{}'".format(
@@ -244,7 +254,7 @@ CONVERSION_FUNCTIONS: Dict[Tuple[str, str], Callable[..., Any]] = {
     ),
     ("excel", "txt"): lambda conn, file, out_file, sheet=None, range_=None, **kwargs: (
         lambda dt: conn.sql(
-            "SELECT * FROM read_xlsx('{}'{}{})".format(
+            "SELECT * FROM read_xlsx('{}', all_varchar = 'true'{}{})".format(
                 str(file.resolve()),
                 (
                     ", sheet = '{}'".format(
@@ -257,17 +267,11 @@ CONVERSION_FUNCTIONS: Dict[Tuple[str, str], Callable[..., Any]] = {
             )
         ).write_csv(str(out_file.resolve()), sep=dt)
     )(
-        kwargs.get("delimiter")
-        if kwargs.get("delimiter") is not None
-        else (
-            "\t"
-            if input(
-                "For TXT export, choose t for tab separated or c for comma separated: "
-            )
-            .strip()
-            .lower()
-            == "t"
-            else ","
-        )
+        input("For TXT export, choose T for tab separated or C for comma separated: ")
+        .strip()
+        .lower()
+        == "t"
+        and "\t"
+        or ","
     ),
 }

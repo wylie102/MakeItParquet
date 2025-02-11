@@ -34,7 +34,7 @@ from cli_parser import (
     get_file_type_by_extension,
     prompt_excel_options,
 )
-from path_manager import create_path_manager
+from path_manager import create_path_manager, FilePathManager
 from conversions import CONVERSION_FUNCTIONS
 
 # Configure logging
@@ -103,6 +103,9 @@ def process_file(
 def main():
     args = parse_cli_arguments()
     input_path = Path(args.input_path).resolve()
+    logging.info(
+        f"Input path: {input_path}, Exists: {input_path.exists()}, is_file: {input_path.is_file()}, is_dir: {input_path.is_dir()}"
+    )
 
     # The -o option is now used as the output type alias (e.g., "pq" for parquet, "tsv" for TSV)
     if args.output_type:
@@ -131,103 +134,106 @@ def main():
                 logging.error(f"Unsupported output format: {user_output}")
                 return
 
+    # --- Get delimiter for TXT export from CLI
+    extra_kwargs = {}
+    if out_type == "txt":
+        if args.delimiter is not None:
+            d = args.delimiter.strip().lower()
+            if d == "t":
+                extra_kwargs["delimiter"] = "\t"
+            elif d == "c":
+                extra_kwargs["delimiter"] = ","
+            else:
+                extra_kwargs["delimiter"] = args.delimiter
+        else:
+            answer = (
+                input(
+                    "For TXT export, choose t for tab separated or c for comma separated: "
+                )
+                .strip()
+                .lower()
+            )
+            extra_kwargs["delimiter"] = "\t" if answer == "t" else ","
+
+    if input_path.is_file():
+        files_to_process = [input_path]
+        output_dest = None  # File will be processed individually.
+    elif input_path.is_dir():
+        pm = create_path_manager(input_path, out_type)
+        if pm is None or not (hasattr(pm, "get_files") and hasattr(pm, "output_path")):
+            logging.error("Invalid path manager for directory input.")
+            return
+        if args.input_type:
+            desired_type = FILE_TYPE_ALIASES[args.input_type.lower()]
+        else:
+            desired_type = pm.input_alias
+            if desired_type is None:
+                logging.error("Could not infer majority alias for the input directory.")
+                return
+        files_to_process = pm.get_files(desired_type)
+        output_dest = pm.output_path
+        output_dest.mkdir(parents=True, exist_ok=True)
+    else:
+        logging.error(f"Input path '{input_path}' is neither a file nor a directory.")
+        return
+
+    if not files_to_process:
+        logging.error(f"No valid input files found in {input_path}.")
+        return
+
+    # Determine Excel options once for the whole batch if needed.
+    common_excel_sheet = args.sheet
+    common_excel_range = args.range
+    if args.sheet is None and args.range is None:
+        # Check if there is any Excel file in the batch
+        excel_files = [
+            f for f in files_to_process if get_file_type_by_extension(f) == "excel"
+        ]
+        if excel_files:
+            logging.info(
+                "Excel options required for processing Excel files, prompting once."
+            )
+            # Prompt using the first Excel file found
+            common_excel_sheet, common_excel_range = prompt_excel_options(
+                excel_files[0]
+            )
+
     with duckdb.connect(database=":memory:") as conn:
-        # Install and load the excel extension using the Python API.
         try:
             conn.install_extension("excel")
             conn.load_extension("excel")
         except Exception as e:
             logging.error(f"Failed to install/load excel extension: {e}")
+            return
 
-        # --- NEW: Get delimiter for TXT export from CLI or prompt once ---
-        extra_kwargs = {}
-        if out_type == "txt":
-            if args.delimiter is not None:
-                d = args.delimiter.strip().lower()
-                if d == "t":
-                    extra_kwargs["delimiter"] = "\t"
-                elif d == "c":
-                    extra_kwargs["delimiter"] = ","
-                else:
-                    extra_kwargs["delimiter"] = args.delimiter
+        for file in files_to_process:
+            detected = get_file_type_by_extension(file)
+            if detected is None:
+                logging.info(f"Skipping file with unsupported extension: {file.name}")
+                continue
+
+            in_type = (
+                FILE_TYPE_ALIASES[args.input_type.lower()]
+                if args.input_type
+                else detected
+            )
+
+            if in_type == "excel":
+                excel_sheet = common_excel_sheet
+                excel_range = common_excel_range
             else:
-                answer = (
-                    input(
-                        "For TXT export, choose t for tab separated or c for comma separated: "
-                    )
-                    .strip()
-                    .lower()
-                )
-                extra_kwargs["delimiter"] = "\t" if answer == "t" else ","
-        # --- END NEW ---
-
-        if input_path.is_file():
-            # Determine input type (CLI override or auto-detect)
-            if args.input_type:
-                in_type = FILE_TYPE_ALIASES[args.input_type.lower()]
-            else:
-                detected = get_file_type_by_extension(input_path)
-                if detected is None:
-                    logging.error(
-                        f"Could not automatically detect file type for {input_path}"
-                    )
-                    return
-                in_type = detected
-
-            excel_sheet = args.sheet
-            excel_range = args.range
-            if in_type == "excel" and (excel_sheet is None and excel_range is None):
-                excel_sheet, excel_range = prompt_excel_options(input_path)
+                excel_sheet = args.sheet
+                excel_range = args.range
 
             process_file(
-                input_path,
+                file,
                 in_type,
                 out_type,
                 conn,
                 excel_sheet,
                 excel_range,
+                output_dir=output_dest,
                 **extra_kwargs,
-            )
-        elif input_path.is_dir():
-            # Create output destination directory using the path manager.
-            pm = create_path_manager(input_path, out_type)
-            output_dest = pm.output_path
-            output_dest.mkdir(parents=True, exist_ok=True)
-
-            # Process each file in the directory using the output type alias (-o)
-            for file in input_path.iterdir():
-                if file.is_file():
-                    detected = get_file_type_by_extension(file)
-                    if detected is None:
-                        logging.info(
-                            f"Skipping file with unsupported extension: {file.name}"
-                        )
-                        continue
-                    in_type = (
-                        FILE_TYPE_ALIASES[args.input_type.lower()]
-                        if args.input_type
-                        else detected
-                    )
-                    excel_sheet = args.sheet
-                    excel_range = args.range
-                    if in_type == "excel" and (
-                        excel_sheet is None and excel_range is None
-                    ):
-                        logging.info(f"For Excel file '{file.name}':")
-                        excel_sheet, excel_range = prompt_excel_options(file)
-                    process_file(
-                        file,
-                        in_type,
-                        out_type,
-                        conn,
-                        excel_sheet,
-                        excel_range,
-                        output_dir=output_dest,
-                        **extra_kwargs,
-                    )
-        else:
-            logging.error(
-                f"Input path '{input_path}' is neither a file nor a directory."
             )
 
 

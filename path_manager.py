@@ -154,6 +154,22 @@ class DirectoryPathManager(BasePathManager):
         else:
             return f"{self.input_name} {self.output_ext}"
 
+    def get_files(self, desired_input_type: Optional[str] = None) -> list:
+        """
+        Return a list of file Paths in the directory that have a recognised extension.
+        If `desired_input_type` is provided, only return files whose inferred type matches it.
+        """
+        allowed = set(self.ALLOWED_EXT_MAP.keys())
+        files = []
+        for f in self.input_path.iterdir():
+            if f.is_file() and f.suffix.lower() in allowed:
+                if (
+                    desired_input_type is None
+                    or self.ALLOWED_EXT_MAP[f.suffix.lower()] == desired_input_type
+                ):
+                    files.append(f)
+        return files
+
 
 def create_path_manager(input_path: Path, output_ext: str) -> BasePathManager:
     """

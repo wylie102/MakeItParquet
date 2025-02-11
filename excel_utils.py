@@ -6,6 +6,7 @@ This module contains helper functions to build Excel options clauses and to expo
 Excel files with various conversion logic.
 """
 
+
 import duckdb
 import uuid
 import tempfile
@@ -60,10 +61,13 @@ def export_excel_with_inferred_types(
 
     table_name = f"tmp_conv_{uuid.uuid4().hex}"
     try:
-        create_table_query = f"CREATE TEMPORARY TABLE {table_name} AS SELECT * FROM read_csv_auto('{sample_csv}', HEADER=true) LIMIT 0"
+        create_table_query = f"""
+        CREATE TEMPORARY TABLE {table_name} AS 
+        SELECT * FROM read_csv_auto('{sample_csv}') LIMIT 0
+        """
         conn.execute(create_table_query)
 
-        copy_cmd = f"COPY {table_name} FROM '{file_path}' WITH (FORMAT 'xlsx', HEADER 'true'{excel_options})"
+        copy_cmd = f"COPY {table_name} FROM '{file_path}' WITH (FORMAT 'xlsx', HEADER{excel_options})"
         conn.execute(copy_cmd)
 
         if fmt == "json":
@@ -107,7 +111,7 @@ def export_excel(
 
     if row_count <= effective_limit:
         conn.sql(
-            f"COPY ({base_query}) TO '{out_file_path}' WITH (FORMAT 'xlsx', header 'true')"
+            f"COPY ({base_query}) TO '{out_file_path}' WITH (FORMAT 'xlsx', HEADER)"
         )
         return
 
@@ -138,7 +142,6 @@ def export_excel(
             f"Exporting part {part+1} with {part_count} rows (offset {offset})."
         )
 
-        # Generate a unique file name for this partition.
         out_file_part = out_file.parent / f"{out_file.stem}_{part+1}{out_file.suffix}"
         unique_out_file = out_file_part
         counter = 1
@@ -149,5 +152,5 @@ def export_excel(
             counter += 1
 
         conn.sql(
-            f"COPY ({part_query}) TO '{unique_out_file.resolve()}' WITH (FORMAT 'xlsx', header 'true')"
+            f"COPY ({part_query}) TO '{unique_out_file.resolve()}' WITH (FORMAT 'xlsx', HEADER)"
         )

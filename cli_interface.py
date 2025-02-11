@@ -13,86 +13,6 @@ import logging
 
 # --- CLI Argument Parsing and File Type Helpers ---
 
-FILE_TYPE_ALIASES = {
-    "csv": "csv",
-    "txt": "txt",
-    "tsv": "tsv",
-    "json": "json",
-    "excel": "excel",
-    "xlsx": "excel",
-    "xls": "excel",
-    "parquet": "parquet",
-    "pq": "parquet",
-}
-
-
-def parse_cli_arguments():
-    parser = argparse.ArgumentParser(
-        description="DuckConvert: Convert data files using DuckDB"
-    )
-    parser.add_argument("input_path", help="Path to the input file or directory")
-    parser.add_argument("-i", "--input_type", help="Specify input file type")
-    parser.add_argument("-o", "--output_type", help="Specify output file type")
-    parser.add_argument("-s", "--sheet", help="Excel sheet (name or number)", type=str)
-    parser.add_argument("-c", "--range", help="Excel range (e.g., A2:E7)", type=str)
-    parser.add_argument("-d", "--delimiter", help="Delimiter for TXT export", type=str)
-    parser.add_argument(
-        "--log-level",
-        help="Set the logging level (e.g., DEBUG, INFO, WARNING)",
-        default="INFO",
-    )
-    args = parser.parse_args()
-
-    # Configure logging based on arguments.
-    numeric_level = getattr(logging, args.log_level.upper(), None)
-    if not isinstance(numeric_level, int):
-        numeric_level = logging.INFO
-    logging.basicConfig(
-        level=numeric_level, format="%(asctime)s - %(levelname)s - %(message)s"
-    )
-    return args
-
-
-def get_file_type_by_extension(file_path: Path) -> Optional[str]:
-    ext = file_path.suffix.lower()
-    if ext == ".csv":
-        return "csv"
-    elif ext in [".tsv", ".txt"]:
-        return "txt"
-    elif ext == ".json":
-        return "json"
-    elif ext in [".parquet", ".pq"]:
-        return "parquet"
-    elif ext in [".xlsx", ".xls"]:
-        return "excel"
-    else:
-        return None
-
-
-def prepare_cli_options(args):
-    """
-    Validate and prepare CLI options, handling prompts if needed.
-    Returns a tuple of (input_path, output_type).
-    """
-    input_path = Path(args.input_path).resolve()
-    if not (input_path.is_file() or input_path.is_dir()):
-        logging.error(f"Input path '{input_path}' is neither a file nor a directory.")
-        raise ValueError("Invalid input path")
-    out_type = (
-        args.output_type.strip().lower()
-        if args.output_type
-        else prompt_for_output_type()
-    )
-    try:
-        out_type = FILE_TYPE_ALIASES[out_type]
-    except KeyError:
-        logging.error(f"Unsupported output format: {out_type}")
-        raise ValueError("Invalid output type specified")
-    return input_path, out_type
-
-
-# --- User Interaction Functions ---
-
 
 def get_delimiter(
     existing: Optional[str] = None,
@@ -135,7 +55,9 @@ def prompt_excel_options(file: Path):
     return sheet, range_
 
 
-def get_excel_options_for_files(files: List[Path]) -> Tuple[Optional[str], Optional[str]]:
+def get_excel_options_for_files(
+    files: List[Path],
+) -> Tuple[Optional[str], Optional[str]]:
     """
     If one or more Excel files are present, prompt the user for Excel sheet and range based on
     the first Excel file found. Returns a tuple (sheet, range) or (None, None) if no Excel file exists.
@@ -146,3 +68,92 @@ def get_excel_options_for_files(files: List[Path]) -> Tuple[Optional[str], Optio
         return None, None
     logging.info("Excel options required for processing Excel files, prompting once.")
     return prompt_excel_options(excel_files[0])
+
+
+#############################
+# Settings Class
+#############################
+
+
+class Settings:
+    def __init__(self):
+        self.args = self._parse_cli_arguments()
+        self.input_path = self._resolve_and_validate(Path(self.args.input_path))
+        self.file_or_dir = self._determine_file_or_dir()
+
+    def _parse_cli_arguments(self):
+        parser = argparse.ArgumentParser(
+            description="DuckConvert: Convert data files using DuckDB"
+        )
+        parser.add_argument("input_path", help="Path to the input file or directory")
+        parser.add_argument("-i", "--input_type", help="Specify input file type")
+        parser.add_argument("-o", "--output_type", help="Specify output file type")
+        parser.add_argument(
+            "-s", "--sheet", help="Excel sheet (name or number)", type=str
+        )
+        parser.add_argument("-c", "--range", help="Excel range (e.g., A2:E7)", type=str)
+        parser.add_argument(
+            "-d", "--delimiter", help="Delimiter for TXT export", type=str
+        )
+        parser.add_argument(
+            "--log-level",
+            help="Set the logging level (e.g., DEBUG, INFO, WARNING)",
+            default="INFO",
+        )
+        args = parser.parse_args()
+
+        # Configure logging based on arguments.
+        numeric_level = getattr(logging, args.log_level.upper(), None)
+        if not isinstance(numeric_level, int):
+            numeric_level = logging.INFO
+        logging.basicConfig(
+            level=numeric_level, format="%(asctime)s - %(levelname)s - %(message)s"
+        )
+        return args
+
+    def prompt_for_output_type(self):
+        return (
+            input("Enter desired output format (csv, parquet, json, excel, tsv, txt): ")
+            .strip()
+            .lower()
+        )
+
+    def _resolve_and_validate(self, path: Path) -> Path:
+        resolved_path = path.resolve()
+        if not (resolved_path.is_file() or resolved_path.is_dir()):
+            logging.error(
+                f"Input path '{resolved_path}' is neither a file nor a directory."
+            )
+            raise ValueError("Invalid input path")
+        return resolved_path
+
+    def _determine_file_or_dir(self) -> str:
+        return "file" if self.input_path.is_file() else "dir"
+
+    def _determine_output_type(self):
+        raw_out = (
+            self.args.output_type.strip().lower()
+            if self.args.output_type
+            else self.prompt_for_output_type()
+        )
+        try:
+            self.output_ext = FILE_TYPE_ALIASES[raw_out]
+        except KeyError:
+            logging.error(f"Unsupported output format: {raw_out}")
+            raise ValueError("Invalid output type specified")
+
+    def _determine_excel_options(self):
+        # If Excel options are not provided, prompt for them.
+        if self.args.sheet is None and self.args.range is None:
+            if self.input_path.is_file():
+                excel_files = [self.input_path]
+            else:
+                excel_files = [f for f in self.input_path.glob("*") if f.is_file()]
+            self.args.sheet, self.args.range = get_excel_options_for_files(excel_files)
+
+        # For TXT output, if no delimiter provided, prompt for it.
+        if self.out_type == "txt" and (
+            self.args.delimiter is None or self.args.delimiter.strip() == ""
+        ):
+            txt_kwargs = prompt_for_txt_delimiter()
+            self.args.delimiter = txt_kwargs["delimiter"]

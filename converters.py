@@ -11,7 +11,7 @@ import duckdb
 # These are assumed to be defined elsewhere in your project.
 from excel_utils import ExcelUtils
 from cli_interface import get_delimiter
-from path_manager import normalize_path
+from conversion_manager import normalize_path
 
 # === Conversion Classes ===
 

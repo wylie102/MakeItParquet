@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+# /// script
+# dependencies = [
+#     "duckdb",
+# ]
+# ///
 """
 DuckConvert: A conversion tool to convert between popular data storage file types
 (CSV/TXT, JSON, Parquet, Excel) using DuckDB's Python API.
@@ -17,16 +22,13 @@ import duckdb
 from typing import Optional
 
 from cli_interface import (
-    parse_cli_arguments,
     FILE_TYPE_ALIASES,
     get_file_type_by_extension,
-    prompt_for_txt_delimiter,
-    prepare_cli_options,
-    get_excel_options_for_files,
+    create_path_manager,
+    get_conversion_instance,
+    ExcelUtils,
+    Settings,
 )
-from path_manager import create_path_manager
-from conversions import get_conversion_instance
-from excel_utils import ExcelUtils
 
 # Mapping of output file extensions for naming purposes.
 EXTENSIONS = {
@@ -82,8 +84,11 @@ def process_file(
             dst=output_file,
             input_format=in_type,
             output_format=out_type,
-            sheet=excel_sheet,
-            range_=excel_range,
+            **(
+                {"sheet": excel_sheet, "range_": excel_range}
+                if in_type == "excel"
+                else {}
+            ),
             **kwargs,
         )
         conversion.run()
@@ -92,29 +97,15 @@ def process_file(
         logging.error(f"Error processing file {file.name}: {e}")
 
 
-def convert(args):
-    # Validate CLI options and get the input path and desired output type.
-    input_path, out_type = prepare_cli_options(args)
-    # Create a path manager to handle file or directory inputs.
-    pm = create_path_manager(input_path, out_type)
-    files_to_process, output_dest, source_type = pm.get_conversion_params()
+def convert(args: Settings) -> None:
+    # 'args' is now a Settings instance.
 
-    # Gather Excel options
-    if args.sheet is None and args.range is None:
-        common_excel_sheet, common_excel_range = get_excel_options_for_files(
-            files_to_process
-        )
-    else:
-        common_excel_sheet, common_excel_range = args.sheet, args.range
-
-    extra_kwargs = {}
-    if out_type == "txt":
-        extra_kwargs = prompt_for_txt_delimiter()
+    extra_kwargs = {"delimiter": args.args.delimiter} if args.out_type == "txt" else {}
 
     # Open an in-memory DuckDB connection.
     with duckdb.connect(database=":memory:") as conn:
-        if not ExcelUtils.load_extension(conn):
-            return
+        # Determine if the Excel extension is needed.
+        ExcelUtils.excel_check_and_load(conn, args.out_type, args, files_to_process)
         for f in files_to_process:
             detected = get_file_type_by_extension(f)
             if detected is None:
@@ -122,21 +113,17 @@ def convert(args):
                 continue
             # Use the CLI input type if provided; otherwise, use auto-detected type.
             in_type = (
-                FILE_TYPE_ALIASES[args.input_type.lower()]
-                if args.input_type
+                FILE_TYPE_ALIASES[args.args.input_type.lower()]
+                if args.args.input_type
                 else detected
             )
-            if in_type == "excel":
-                excel_sheet, excel_range = (common_excel_sheet, common_excel_range)
-            else:
-                excel_sheet, excel_range = args.sheet, args.range
             process_file(
                 f,
                 in_type,
-                out_type,
+                args.out_type,
                 conn,
-                excel_sheet,
-                excel_range,
+                args.args.sheet,
+                args.args.range,
                 output_dir=output_dest,
                 **extra_kwargs,
             )
@@ -144,8 +131,9 @@ def convert(args):
 
 def main():
     try:
-        args = parse_cli_arguments()
-        convert(args)
+        settings = Settings()
+        conversion_manager = create_path_manager(settings)
+        convert(conversion_manager)
     except Exception as e:
         logging.error(f"Conversion failed: {e}")
 

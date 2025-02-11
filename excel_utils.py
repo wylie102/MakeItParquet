@@ -13,6 +13,10 @@ import tempfile
 import os
 from pathlib import Path
 import logging
+import argparse
+from typing import List
+
+from cli_interface import FILE_TYPE_ALIASES, get_file_type_by_extension
 
 
 class ExcelUtils:
@@ -162,6 +166,35 @@ class ExcelUtils:
 
     @staticmethod
     def load_extension(conn: duckdb.DuckDBPyConnection) -> bool:
+        try:
+            conn.install_extension("excel")
+            conn.load_extension("excel")
+            return True
+        except Exception as e:
+            logging.error(f"Failed to install/load excel extension: {e}")
+            return False
+
+    @staticmethod
+    def excel_check_and_load(
+        conn: duckdb.DuckDBPyConnection,
+        out_type: str,
+        args: argparse.Namespace,
+        files_to_process: List[Path],
+    ) -> bool:
+        """
+        Check if the Excel extension is required and load it if necessary.
+        """
+        requires_excel = (
+            (out_type == "excel")
+            or (
+                args.input_type
+                and FILE_TYPE_ALIASES[args.input_type.lower()] == "excel"
+            )
+            or any(get_file_type_by_extension(f) == "excel" for f in files_to_process)
+        )
+        if requires_excel:
+            if not ExcelUtils.load_extension(conn):
+                return False
         try:
             conn.install_extension("excel")
             conn.load_extension("excel")

@@ -27,8 +27,8 @@ from cli_interface import (
     FILE_TYPE_ALIASES,
     get_file_type_by_extension,
     prompt_excel_options,
-    prompt_for_output_type,  # new import
-    prompt_for_txt_delimiter,  # new import
+    prompt_for_txt_delimiter,
+    prepare_cli_options,
 )
 from path_manager import create_path_manager
 from conversions import CONVERSION_FUNCTIONS
@@ -100,113 +100,63 @@ def process_file(
         logging.error(f"Error processing file {file.name}: {e}")
 
 
-# --- Main orchestration wrapped in a class ---
+def convert(args):
+    input_path, out_type = prepare_cli_options(args)
+    pm = create_path_manager(input_path, out_type)
+    (files_to_process, output_dest, source_type) = pm.get_conversion_params()
 
-
-class DuckConvert:
-    def __init__(self):
-        self.args = parse_cli_arguments()
-        self.input_path = Path(self.args.input_path).resolve()
-        if not (self.input_path.is_file() or self.input_path.is_dir()):
-            logging.error(
-                f"Input path '{self.input_path}' is neither a file nor a directory."
+    # gather Excel options once
+    common_excel_sheet = args.sheet
+    common_excel_range = args.range
+    if common_excel_sheet is None and common_excel_range is None:
+        excel_files = [
+            f for f in files_to_process if get_file_type_by_extension(f) == "excel"
+        ]
+        if excel_files:
+            logging.info(
+                "Excel options required for processing Excel files, prompting once."
             )
-            raise ValueError("Invalid input path")
-        self.out_type = (
-            self.args.output_type.strip().lower()
-            if self.args.output_type
-            else prompt_for_output_type()
-        )
-        try:
-            self.out_type = FILE_TYPE_ALIASES[self.out_type]
-        except KeyError:
-            logging.error(f"Unsupported output format: {self.out_type}")
-            raise ValueError("Invalid output type specified")
-        
-        # New, simplified conversion parameter preparation:
-        if self.input_path.is_file():
-            self.files_to_process = [self.input_path]
-            self.output_dest = None
-            self.source_type = self.input_path.suffix.lstrip(".").lower()
-        else:
-            pm = create_path_manager(self.input_path, self.out_type)
-            self.files_to_process = pm.get_files(pm.input_alias)
-            self.output_dest = pm.output_path
-            self.output_dest.mkdir(parents=True, exist_ok=True)
-            self.source_type = pm.input_alias
+            common_excel_sheet, common_excel_range = prompt_excel_options(
+                excel_files[0]
+            )
 
-        # Determine Excel options once if needed.
-        self.common_excel_sheet = self.args.sheet
-        self.common_excel_range = self.args.range
-        if self.args.sheet is None and self.args.range is None:
-            excel_files = [
-                f
-                for f in self.files_to_process
-                if get_file_type_by_extension(f) == "excel"
-            ]
-            if excel_files:
-                logging.info(
-                    "Excel options required for processing Excel files, prompting once."
-                )
-                self.common_excel_sheet, self.common_excel_range = prompt_excel_options(
-                    excel_files[0]
-                )
+    extra_kwargs = {}
+    if out_type == "txt":
+        extra_kwargs = prompt_for_txt_delimiter()
 
-        # Determine extra kwargs for TXT export.
-        self.extra_kwargs = {}
-        if self.out_type == "txt":
-            self.extra_kwargs = prompt_for_txt_delimiter()
-
-    def run(self):
-        """
-        Open a DuckDB connection (with the Excel extension loaded) and process each file.
-        """
-        with duckdb.connect(database=":memory:") as conn:
-            if not load_excel_extension(conn):
-                return
-            for file in self.files_to_process:
-                detected = get_file_type_by_extension(file)
-                if detected is None:
-                    logging.info(
-                        f"Skipping file with unsupported extension: {file.name}"
-                    )
-                    continue
-                in_type = (
-                    FILE_TYPE_ALIASES[self.args.input_type.lower()]
-                    if self.args.input_type
-                    else detected
-                )
-                if in_type == "excel":
-                    excel_sheet, excel_range = (
-                        self.common_excel_sheet,
-                        self.common_excel_range,
-                    )
-                else:
-                    excel_sheet, excel_range = self.args.sheet, self.args.range
-                process_file(
-                    file,
-                    in_type,
-                    self.out_type,
-                    conn,
-                    excel_sheet,
-                    excel_range,
-                    output_dir=self.output_dest,
-                    **self.extra_kwargs,
-                )
+    with duckdb.connect(database=":memory:") as conn:
+        if not load_excel_extension(conn):
+            return
+        for f in files_to_process:
+            detected = get_file_type_by_extension(f)
+            if detected is None:
+                logging.info(f"Skipping file with unsupported extension: {f.name}")
+                continue
+            in_type = (
+                FILE_TYPE_ALIASES[args.input_type.lower()]
+                if args.input_type
+                else detected
+            )
+            if in_type == "excel":
+                excel_sheet, excel_range = (common_excel_sheet, common_excel_range)
+            else:
+                excel_sheet, excel_range = args.sheet, args.range
+            process_file(
+                f,
+                in_type,
+                out_type,
+                conn,
+                excel_sheet,
+                excel_range,
+                output_dir=output_dest,
+                **extra_kwargs,
+            )
 
 
 def main():
     try:
         args = parse_cli_arguments()
-        # configure logging based on user input
-        numeric_level = getattr(logging, args.log_level.upper(), None)
-        if not isinstance(numeric_level, int):
-            numeric_level = logging.INFO
-        logging.basicConfig(
-            level=numeric_level, format="%(asctime)s - %(levelname)s - %(message)s"
-        )
-        converter = DuckConvert()
-        converter.run()
+        convert(args)
     except Exception as e:
         logging.error(f"Conversion failed: {e}")
 

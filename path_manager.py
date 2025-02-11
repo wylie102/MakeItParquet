@@ -105,6 +105,12 @@ class FilePathManager(BasePathManager):
         """
         return self.input_path.with_suffix(f".{self.output_ext}")
 
+    def get_conversion_params(self):
+        """
+        Return (files, output_dest, source_type).
+        """
+        return ([self.input_path], None, self.input_path.suffix.lstrip(".").lower())
+
 
 def infer_majority_alias_in_directory(
     directory: Path, naming_ext_map: Dict[str, str]
@@ -169,6 +175,14 @@ class DirectoryPathManager(BasePathManager):
                     files.append(f)
         return files
 
+    def get_conversion_params(self):
+        """
+        Return (files, output_dest, source_type), ensuring output directory is created.
+        """
+        files = self.get_files(self.input_alias)
+        self.output_path.mkdir(parents=True, exist_ok=True)
+        return (files, self.output_path, self.input_alias)
+
 
 def create_path_manager(input_path: Path, output_ext: str) -> BasePathManager:
     """
@@ -187,25 +201,3 @@ def create_path_manager(input_path: Path, output_ext: str) -> BasePathManager:
         return FilePathManager(input_path, output_ext)
     else:
         return DirectoryPathManager(input_path, output_ext)
-
-
-def prepare_parameters(input_path: Path, out_type: str) -> tuple:
-    """
-    Prepare conversion parameters from the input path using path management.
-
-    Returns:
-        files: list of file Paths (for a file, a singleton list).
-        output_dest: output directory (None for file input).
-        source_type: inferred type alias.
-    """
-    if input_path.is_file():
-        pm = FilePathManager(input_path, out_type)
-        # For a single file, source_type is inferred from the extension.
-        alias = input_path.suffix.lstrip(".").lower()
-        return ([input_path], None, alias)
-    else:
-        dpm = DirectoryPathManager(input_path, out_type)
-        files = dpm.get_files(dpm.input_alias)
-        output_dest = dpm.output_path
-        output_dest.mkdir(parents=True, exist_ok=True)
-        return (files, output_dest, dpm.input_alias)

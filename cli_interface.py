@@ -9,6 +9,7 @@ and common user interactions (prompts for output type, Excel options, and TXT de
 import argparse
 from pathlib import Path
 from typing import Optional
+import logging
 
 # --- CLI Argument Parsing and File Type Helpers ---
 
@@ -40,7 +41,18 @@ def parse_cli_arguments():
         help="Set the logging level (e.g., DEBUG, INFO, WARNING)",
         default="INFO",
     )
-    return parser.parse_args()
+
+    args = parser.parse_args()
+
+    # Configure logging based on arguments
+    numeric_level = getattr(logging, args.log_level.upper(), None)
+    if not isinstance(numeric_level, int):
+        numeric_level = logging.INFO
+    logging.basicConfig(
+        level=numeric_level, format="%(asctime)s - %(levelname)s - %(message)s"
+    )
+
+    return args
 
 
 def get_file_type_by_extension(file_path: Path) -> Optional[str]:
@@ -59,18 +71,28 @@ def get_file_type_by_extension(file_path: Path) -> Optional[str]:
         return None
 
 
-def prompt_excel_options(file: Path):
-    sheet = (
-        input(
-            f"Enter Excel sheet for file {file.name} (default: first sheet): "
-        ).strip()
-        or None
+def prepare_cli_options(args):
+    """
+    Validate and prepare CLI options, handling prompts if needed.
+    Returns a tuple of (input_path, output_type).
+    """
+    input_path = Path(args.input_path).resolve()
+    if not (input_path.is_file() or input_path.is_dir()):
+        logging.error(f"Input path '{input_path}' is neither a file nor a directory.")
+        raise ValueError("Invalid input path")
+
+    out_type = (
+        args.output_type.strip().lower()
+        if args.output_type
+        else prompt_for_output_type()
     )
-    range_ = (
-        input(f"Enter Excel cell range for file {file.name} (or leave blank): ").strip()
-        or None
-    )
-    return sheet, range_
+    try:
+        out_type = FILE_TYPE_ALIASES[out_type]
+    except KeyError:
+        logging.error(f"Unsupported output format: {out_type}")
+        raise ValueError("Invalid output type specified")
+
+    return input_path, out_type
 
 
 # --- User Interaction Functions ---
@@ -114,4 +136,15 @@ def prompt_for_txt_delimiter() -> dict:
     return {"delimiter": "\t" if answer == "t" else ","}
 
 
-# ...any additional helper or interaction functions...
+def prompt_excel_options(file: Path):
+    sheet = (
+        input(
+            f"Enter Excel sheet for file {file.name} (default: first sheet): "
+        ).strip()
+        or None
+    )
+    range_ = (
+        input(f"Enter Excel cell range for file {file.name} (or leave blank): ").strip()
+        or None
+    )
+    return sheet, range_

@@ -30,7 +30,7 @@ from cli_interface import (
     prompt_for_output_type,  # new import
     prompt_for_txt_delimiter,  # new import
 )
-from path_manager import prepare_parameters, create_path_manager
+from path_manager import create_path_manager
 from conversions import CONVERSION_FUNCTIONS
 from excel_utils import load_excel_extension
 

@@ -98,12 +98,16 @@ def export_excel_with_inferred_types(
                 try:
                     conn.execute(f"DROP TABLE IF EXISTS {table_name}")
                 except Exception as drop_error:
-                    logging.warning(f"Failed to drop temporary table {table_name}: {drop_error}")
+                    logging.warning(
+                        f"Failed to drop temporary table {table_name}: {drop_error}"
+                    )
             try:
                 if os.path.exists(sample_csv):
                     os.remove(sample_csv)
             except Exception as remove_error:
-                logging.warning(f"Failed to remove temporary file {sample_csv}: {remove_error}")
+                logging.warning(
+                    f"Failed to remove temporary file {sample_csv}: {remove_error}"
+                )
     except Exception as e:
         logging.error(f"Error during Excel export: {e}")
         raise
@@ -173,3 +177,16 @@ def export_excel(
         conn.sql(
             f"COPY ({part_query}) TO '{unique_out_file.resolve()}' WITH (FORMAT 'xlsx', HEADER)"
         )
+
+
+def load_excel_extension(conn: duckdb.DuckDBPyConnection) -> bool:
+    """
+    Install and load the Excel extension on the given DuckDB connection.
+    """
+    try:
+        conn.install_extension("excel")
+        conn.load_extension("excel")
+        return True
+    except Exception as e:
+        logging.error(f"Failed to install/load excel extension: {e}")
+        return False

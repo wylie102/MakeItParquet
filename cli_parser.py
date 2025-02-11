@@ -1,108 +1,67 @@
 #!/usr/bin/env python3
-# /// script
-# dependencies = [
-#     "duckdb",
-# ]
-# ///
-
 """
 CLI Parser module for DuckConvert.
 
-Provides command-line argument parsing and helper functions.
+Provides functions to parse command-line arguments, file type aliases,
+and helper functions to detect file types and prompt for Excel options.
 """
 
 import argparse
 from pathlib import Path
-from typing import Optional, Dict
+from typing import Optional
 
-# Mapping for file type aliases.
+# Map common file type names/aliases to canonical names.
 FILE_TYPE_ALIASES = {
     "csv": "csv",
-    "txt": "csv",  # Process .txt as CSV.
-    "tsv": "csv",  # Process .tsv as CSV.
+    "txt": "txt",
+    "tsv": "tsv",
     "json": "json",
-    "js": "json",  
-    "parquet": "parquet",
-    "parq": "parquet",
-    "pq": "parquet",
     "excel": "excel",
     "xlsx": "excel",
-    "ex": "excel",  
+    "xls": "excel",
+    "parquet": "parquet",
+    "pq": "parquet",
 }
 
 
 def parse_cli_arguments():
-    """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
-        description="Convert between data file types using DuckDB."
+        description="DuckConvert: Convert data files using DuckDB"
     )
-    parser.add_argument("input_path", help="Path to the input file or directory.")
-    parser.add_argument(
-        "-o",
-        "--output_type",
-        help="Output file type (csv, parquet, json, excel).",
-        default=None,
-    )
-    parser.add_argument(
-        "-i",
-        "--input_type",
-        help="Input file type (csv, json, parquet, excel).",
-        default=None,
-    )
-    parser.add_argument(
-        "-s",
-        "--sheet",
-        help="Excel sheet number or name (for Excel input).",
-        default=None,
-    )
-    parser.add_argument(
-        "-c",
-        "--range",
-        help="Excel cell range (for Excel input, e.g., A1:D100).",
-        default=None,
-    )
-    parser.add_argument(
-        "-d",
-        "--delimiter",
-        help="Delimiter to use for TXT export (use 't' for tab, 'c' for comma or provide a literal value)",
-        default=None,
-    )
+    parser.add_argument("input_path", help="Path to the input file or directory")
+    parser.add_argument("-i", "--input_type", help="Specify input file type")
+    parser.add_argument("-o", "--output_type", help="Specify output file type")
+    parser.add_argument("-s", "--sheet", help="Excel sheet (name or number)", type=str)
+    parser.add_argument("-c", "--range", help="Excel range (e.g., A2:E7)", type=str)
+    parser.add_argument("-d", "--delimiter", help="Delimiter for TXT export", type=str)
     return parser.parse_args()
 
 
-def get_file_type_by_extension(path: Path) -> Optional[str]:
-    """
-    Determine file type based on file extension.
-
-    Returns the canonical file type (e.g., 'csv', 'json', etc.) or None if unsupported.
-    """
-    ext = path.suffix.lower()
-    extension_map: Dict[str, str] = {
-        ".csv": "csv",
-        ".txt": "csv",
-        ".tsv": "csv",  # Added for TSV files.
-        ".json": "json",
-        ".parquet": "parquet",
-        ".parq": "parquet",
-        ".pq": "parquet",
-        ".xlsx": "excel",
-    }
-    return extension_map.get(ext)
+def get_file_type_by_extension(file_path: Path) -> Optional[str]:
+    ext = file_path.suffix.lower()
+    if ext == ".csv":
+        return "csv"
+    elif ext in [".tsv", ".txt"]:
+        return "txt"
+    elif ext == ".json":
+        return "json"
+    elif ext in [".parquet", ".pq"]:
+        return "parquet"
+    elif ext in [".xlsx", ".xls"]:
+        return "excel"
+    else:
+        return None
 
 
-def prompt_excel_options(file_path: Path):
-    """
-    Prompt the user for Excel options if not provided via CLI.
-
-    Returns:
-        A tuple of (sheet, range) options.
-    """
-    print(f"Excel options required for file: {file_path.name}")
+def prompt_excel_options(file: Path):
     sheet = (
-        input("Enter sheet name or number (default is first sheet): ").strip() or None
-    )
-    cell_range = (
-        input("Enter cell range (e.g., A1:D100) or leave blank for all data: ").strip()
+        input(
+            f"Enter Excel sheet for file {file.name} (default: first sheet): "
+        ).strip()
         or None
     )
-    return sheet, cell_range
+    range_ = (
+        input(f"Enter Excel cell range for file {file.name} (or leave blank): ").strip()
+        or None
+    )
+    return sheet, range_

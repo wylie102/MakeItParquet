@@ -21,13 +21,13 @@ FILE_TYPE_ALIASES = {
     "txt": "csv",  # Process .txt as CSV.
     "tsv": "csv",  # Process .tsv as CSV.
     "json": "json",
-    "js": "json",  # Added alias for JSON.
+    "js": "json",  
     "parquet": "parquet",
     "parq": "parquet",
     "pq": "parquet",
     "excel": "excel",
     "xlsx": "excel",
-    "ex": "excel",  # Added alias "ex" for Excel.
+    "ex": "excel",  
 }
 
 

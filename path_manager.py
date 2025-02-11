@@ -59,6 +59,7 @@ class BasePathManager:
 
         self.input_name: str = self.input_path.name
         self.input_dir: Path = self.input_path.parent
+        self.input_alias: Optional[str] = None  # Added default input_alias attribute
 
     @staticmethod
     def _replace_alias_in_string(text: str, old_alias: str, new_alias: str) -> str:

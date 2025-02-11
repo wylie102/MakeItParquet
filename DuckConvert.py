@@ -95,19 +95,79 @@ def process_file(
             )
         else:
             CONVERSION_FUNCTIONS[conversion_key](conn, file, output_file, **kwargs)
-        logging.info(f"Written {out_type} file: {output_file.resolve()}")
+        logging.info(f"File {file.name} converted to {output_file.name}")
     except Exception as e:
         logging.error(f"Error processing file {file.name}: {e}")
+
+
+def prepare_conversion_parameters(input_path: Path, args, out_type: str):
+    """
+    Return a tuple (files_to_process, output_dest, source_type) based on the input path.
+    For a file, output_dest is None; for a directory, it is provided by the path manager.
+    """
+    if input_path.is_file():
+        if args.input_type:
+            try:
+                source_type = FILE_TYPE_ALIASES[args.input_type.lower()]
+            except KeyError:
+                logging.error(f"Unsupported input format: {args.input_type}")
+                return None
+            logging.info("Number of files to be converted: 1")
+            return ([input_path], None, source_type)
+        else:
+            source_type_optional = get_file_type_by_extension(input_path)
+            if source_type_optional is None:
+                if source_type_optional is None:
+                    logging.error("Could not determine input type from file extension.")
+                    return None
+                source_type = source_type_optional
+                logging.info("Number of files to be converted: 1")
+                return ([input_path], None, source_type)
+    elif input_path.is_dir():
+        pm = create_path_manager(input_path, out_type)
+        if pm is None or not (hasattr(pm, "get_files") and hasattr(pm, "output_path")):
+            logging.error("Invalid path manager for directory input.")
+            return None
+        if args.input_type:
+            try:
+                source_type = FILE_TYPE_ALIASES[args.input_type.lower()]
+            except KeyError:
+                logging.error(f"Unsupported input format: {args.input_type}")
+                return None
+            logging.info(f"Input type provided: {source_type}")
+        else:
+            # Retrieve the input type using the path manager.
+            source_type_optional = pm.input_alias
+            if source_type_optional is None:
+                logging.error(
+                    "Could not infer the input type via the path manager for the input directory."
+                )
+                return None
+            source_type = source_type_optional  # now source_type is a str
+            logging.info(
+                f"Detected majority input type from path manager: {source_type}"
+            )
+        files = pm.get_files(source_type)
+        output_dest = pm.output_path
+        output_dest.mkdir(parents=True, exist_ok=True)
+        logging.info(f"Number of files to be converted: {len(files)}")
+        return (files, output_dest, source_type)
+    else:
+        logging.error(f"Input path '{input_path}' is neither a file nor a directory.")
+        return None
 
 
 def main():
     args = parse_cli_arguments()
     input_path = Path(args.input_path).resolve()
-    logging.info(
-        f"Input path: {input_path}, Exists: {input_path.exists()}, is_file: {input_path.is_file()}, is_dir: {input_path.is_dir()}"
-    )
+    if input_path.is_file():
+        logging.info("Input is a file.")
+    elif input_path.is_dir():
+        logging.info("Input is a directory.")
+    else:
+        logging.error(f"Input path '{input_path}' is neither a file nor a directory.")
+        return
 
-    # The -o option is now used as the output type alias (e.g., "pq" for parquet, "tsv" for TSV)
     if args.output_type:
         out_lower = args.output_type.lower()
         if out_lower in ["tsv", "txt"]:
@@ -119,12 +179,10 @@ def main():
                 logging.error(f"Unsupported output format: {args.output_type}")
                 return
     else:
-        # If not provided via -o, prompt the user.
-        user_output = (
-            input("Enter desired output format (csv, parquet, json, excel, tsv, txt): ")
-            .strip()
-            .lower()
+        prompt_msg = (
+            "Enter desired output format (csv, parquet, json, excel, tsv, txt): "
         )
+        user_output = input(prompt_msg).strip().lower()
         if user_output in ["tsv", "txt"]:
             out_type = user_output
         else:
@@ -133,6 +191,65 @@ def main():
             except KeyError:
                 logging.error(f"Unsupported output format: {user_output}")
                 return
+
+    conversion_params = prepare_conversion_parameters(input_path, args, out_type)
+    if conversion_params is None:
+        return
+    files_to_process, output_dest, source_type = conversion_params
+
+    # Determine Excel options once for the whole batch if needed.
+    common_excel_sheet = args.sheet
+    common_excel_range = args.range
+    if args.sheet is None and args.range is None:
+        # Check if there is any Excel file in the batch
+        excel_files = [
+            f for f in files_to_process if get_file_type_by_extension(f) == "excel"
+        ]
+        if excel_files:
+            logging.info(
+                "Excel options required for processing Excel files, prompting once."
+            )
+            common_excel_sheet, common_excel_range = prompt_excel_options(
+                excel_files[0]
+            )
+
+    with duckdb.connect(database=":memory:") as conn:
+        try:
+            conn.install_extension("excel")
+            conn.load_extension("excel")
+        except Exception as e:
+            logging.error(f"Failed to install/load excel extension: {e}")
+            return
+
+        for file in files_to_process:
+            detected = get_file_type_by_extension(file)
+            if detected is None:
+                logging.info(f"Skipping file with unsupported extension: {file.name}")
+                continue
+
+            in_type = (
+                FILE_TYPE_ALIASES[args.input_type.lower()]
+                if args.input_type
+                else detected
+            )
+
+            if in_type == "excel":
+                excel_sheet = common_excel_sheet
+                excel_range = common_excel_range
+            else:
+                excel_sheet = args.sheet
+                excel_range = args.range
+
+            process_file(
+                file,
+                in_type,
+                out_type,
+                conn,
+                excel_sheet,
+                excel_range,
+                output_dir=output_dest,
+                **extra_kwargs,
+            )
 
     # --- Get delimiter for TXT export from CLI
     extra_kwargs = {}
@@ -154,49 +271,6 @@ def main():
                 .lower()
             )
             extra_kwargs["delimiter"] = "\t" if answer == "t" else ","
-
-    if input_path.is_file():
-        files_to_process = [input_path]
-        output_dest = None  # File will be processed individually.
-    elif input_path.is_dir():
-        pm = create_path_manager(input_path, out_type)
-        if pm is None or not (hasattr(pm, "get_files") and hasattr(pm, "output_path")):
-            logging.error("Invalid path manager for directory input.")
-            return
-        if args.input_type:
-            desired_type = FILE_TYPE_ALIASES[args.input_type.lower()]
-        else:
-            desired_type = pm.input_alias
-            if desired_type is None:
-                logging.error("Could not infer majority alias for the input directory.")
-                return
-        files_to_process = pm.get_files(desired_type)
-        output_dest = pm.output_path
-        output_dest.mkdir(parents=True, exist_ok=True)
-    else:
-        logging.error(f"Input path '{input_path}' is neither a file nor a directory.")
-        return
-
-    if not files_to_process:
-        logging.error(f"No valid input files found in {input_path}.")
-        return
-
-    # Determine Excel options once for the whole batch if needed.
-    common_excel_sheet = args.sheet
-    common_excel_range = args.range
-    if args.sheet is None and args.range is None:
-        # Check if there is any Excel file in the batch
-        excel_files = [
-            f for f in files_to_process if get_file_type_by_extension(f) == "excel"
-        ]
-        if excel_files:
-            logging.info(
-                "Excel options required for processing Excel files, prompting once."
-            )
-            # Prompt using the first Excel file found
-            common_excel_sheet, common_excel_range = prompt_excel_options(
-                excel_files[0]
-            )
 
     with duckdb.connect(database=":memory:") as conn:
         try:

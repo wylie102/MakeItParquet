@@ -29,6 +29,13 @@ def _build_excel_options(sheet, range_):
     return f", {', '.join(parts)}" if parts else ""
 
 
+def _build_excel_query(file: Path, sheet, range_) -> str:
+    # Build a query string for reading Excel files
+    file_path = str(file.resolve())
+    options = _build_excel_options(sheet, range_)
+    return f"SELECT * FROM read_xlsx('{file_path}', all_varchar = 'true'{options})"
+
+
 def export_excel_with_inferred_types(
     conn: duckdb.DuckDBPyConnection,
     file: Path,
@@ -55,37 +62,51 @@ def export_excel_with_inferred_types(
     with tempfile.NamedTemporaryFile(delete=False, suffix=".csv") as tmp:
         sample_csv = tmp.name
 
-    sample_query = f"SELECT * FROM read_xlsx('{file_path}', all_varchar = 'true'{excel_options}) LIMIT 1000"
-    conn.sql(sample_query).write_csv(sample_csv, header=True)
-
-    table_name = f"tmp_conv_{uuid.uuid4().hex}"
+    sample_query = _build_excel_query(file, sheet, range_)
+    table_name = None  # initialize here for later cleanup
     try:
-        create_table_query = f"""
-        CREATE TEMPORARY TABLE {table_name} AS 
-        SELECT * FROM read_csv_auto('{sample_csv}') LIMIT 0
-        """
-        conn.execute(create_table_query)
-
-        copy_cmd = f"COPY {table_name} FROM '{file_path}' WITH (FORMAT 'xlsx', HEADER{excel_options})"
-        conn.execute(copy_cmd)
-
-        if fmt == "json":
-            final_copy_cmd = (
-                f"COPY {table_name} TO '{out_file_path}' WITH (FORMAT 'json')"
-            )
-        elif fmt == "parquet":
-            final_copy_cmd = (
-                f"COPY {table_name} TO '{out_file_path}' WITH (FORMAT 'parquet')"
-            )
-        else:
-            raise ValueError("Unsupported format in export_excel_with_inferred_types")
-        conn.execute(final_copy_cmd)
-    finally:
+        conn.sql(sample_query).write_csv(sample_csv, header=True)
+        table_name = f"tmp_conv_{uuid.uuid4().hex}"
         try:
-            conn.execute(f"DROP TABLE IF EXISTS {table_name}")
-        except Exception:
-            pass
-        os.remove(sample_csv)
+            create_table_query = f"""
+            CREATE TEMPORARY TABLE {table_name} AS 
+            SELECT * FROM read_csv_auto('{sample_csv}') LIMIT 0
+            """
+            conn.execute(create_table_query)
+
+            copy_cmd = f"COPY {table_name} FROM '{file_path}' WITH (FORMAT 'xlsx', HEADER{excel_options})"
+            conn.execute(copy_cmd)
+
+            if fmt == "json":
+                final_copy_cmd = (
+                    f"COPY {table_name} TO '{out_file_path}' WITH (FORMAT 'json')"
+                )
+            elif fmt == "parquet":
+                final_copy_cmd = (
+                    f"COPY {table_name} TO '{out_file_path}' WITH (FORMAT 'parquet')"
+                )
+            else:
+                raise ValueError(
+                    "Unsupported format in export_excel_with_inferred_types"
+                )
+            conn.execute(final_copy_cmd)
+        except Exception as e:
+            logging.error(f"Error during Excel export: {e}")
+            raise
+        finally:
+            if table_name is not None:
+                try:
+                    conn.execute(f"DROP TABLE IF EXISTS {table_name}")
+                except Exception as drop_error:
+                    logging.warning(f"Failed to drop temporary table {table_name}: {drop_error}")
+            try:
+                if os.path.exists(sample_csv):
+                    os.remove(sample_csv)
+            except Exception as remove_error:
+                logging.warning(f"Failed to remove temporary file {sample_csv}: {remove_error}")
+    except Exception as e:
+        logging.error(f"Error during Excel export: {e}")
+        raise
 
 
 def export_excel(

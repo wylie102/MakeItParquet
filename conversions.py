@@ -11,6 +11,8 @@ from pathlib import Path
 from typing import Callable, Any, Dict, Tuple
 import duckdb
 import excel_utils as ex
+from cli_interface import get_delimiter
+from path_manager import normalize_path  # updated import
 
 
 # --- Helper functions for generic exports ---
@@ -27,17 +29,10 @@ def export_txt_generic(
     Generic exporter for TXT files.
     Prompts for a delimiter if one is not provided.
     """
-    delimiter = kwargs.get("delimiter")
-    if delimiter is None:
-        answer = (
-            input(
-                "For TXT export, choose t for tab separated or c for comma separated: "
-            )
-            .strip()
-            .lower()
-        )
-        delimiter = "\t" if answer == "t" else ","
-    read_func(str(file.resolve())).write_csv(str(out_file.resolve()), sep=delimiter)
+    delimiter = kwargs.get("delimiter") or get_delimiter(
+        prompt_text="For TXT export, choose t (tab) or c (comma): "
+    )
+    read_func(normalize_path(file)).write_csv(normalize_path(out_file), sep=delimiter)
 
 
 def export_tsv_generic(
@@ -51,7 +46,7 @@ def export_tsv_generic(
     Generic exporter for TSV files.
     Uses tab as the delimiter.
     """
-    read_func(str(file.resolve())).write_csv(str(out_file.resolve()), sep="\t")
+    read_func(normalize_path(file)).write_csv(normalize_path(out_file), sep="\t")
 
 
 # --- CSV conversions ---
@@ -60,22 +55,23 @@ def export_tsv_generic(
 def csv_to_parquet(
     conn: duckdb.DuckDBPyConnection, file: Path, out_file: Path, **kwargs
 ) -> None:
-    relation = conn.read_csv(str(file.resolve()))
-    relation.to_parquet(str(out_file.resolve()))
+    conn.read_csv(normalize_path(file)).to_parquet(normalize_path(out_file))
 
 
 def csv_to_json(
     conn: duckdb.DuckDBPyConnection, file: Path, out_file: Path, **kwargs
 ) -> None:
-    conn.read_csv(str(file.resolve())).sql(
-        f"COPY (SELECT * FROM read_csv_auto('{file.resolve()}')) TO '{out_file.resolve()}'"
+    conn.sql(
+        f"COPY (SELECT * FROM read_csv_auto('{normalize_path(file)}')) TO '{normalize_path(out_file)}' (FORMAT JSON)"
     )
 
 
 def csv_to_excel(
     conn: duckdb.DuckDBPyConnection, file: Path, out_file: Path, **kwargs
 ) -> None:
-    ex.export_excel(conn, f"SELECT * FROM read_csv_auto('{file.resolve()}')", out_file)
+    ex.export_excel(
+        conn, f"SELECT * FROM read_csv_auto('{normalize_path(file)}')", out_file
+    )
 
 
 def csv_to_tsv(
@@ -96,19 +92,21 @@ def csv_to_txt(
 def json_to_csv(
     conn: duckdb.DuckDBPyConnection, file: Path, out_file: Path, **kwargs
 ) -> None:
-    conn.read_json(str(file.resolve())).write_csv(str(out_file.resolve()))
+    conn.read_json(normalize_path(file)).write_csv(normalize_path(out_file))
 
 
 def json_to_parquet(
     conn: duckdb.DuckDBPyConnection, file: Path, out_file: Path, **kwargs
 ) -> None:
-    conn.read_json(str(file.resolve())).write_parquet(str(out_file.resolve()))
+    conn.read_json(normalize_path(file)).write_parquet(normalize_path(out_file))
 
 
 def json_to_excel(
     conn: duckdb.DuckDBPyConnection, file: Path, out_file: Path, **kwargs
 ) -> None:
-    ex.export_excel(conn, f"SELECT * FROM read_json('{file.resolve()}')", out_file)
+    ex.export_excel(
+        conn, f"SELECT * FROM read_json('{normalize_path(file)}')", out_file
+    )
 
 
 def json_to_tsv(
@@ -129,21 +127,23 @@ def json_to_txt(
 def parquet_to_csv(
     conn: duckdb.DuckDBPyConnection, file: Path, out_file: Path, **kwargs
 ) -> None:
-    conn.from_parquet(str(file.resolve())).write_csv(str(out_file.resolve()))
+    conn.from_parquet(normalize_path(file)).write_csv(normalize_path(out_file))
 
 
 def parquet_to_json(
     conn: duckdb.DuckDBPyConnection, file: Path, out_file: Path, **kwargs
 ) -> None:
-    conn.from_parquet(str(file.resolve())).sql(
-        f"COPY (SELECT * FROM read_parquet('{file.resolve()}')) TO '{out_file.resolve()}'"
+    conn.sql(
+        f"COPY (SELECT * FROM read_parquet('{normalize_path(file)}')) TO '{normalize_path(out_file)}'"
     )
 
 
 def parquet_to_excel(
     conn: duckdb.DuckDBPyConnection, file: Path, out_file: Path, **kwargs
 ) -> None:
-    ex.export_excel(conn, f"SELECT * FROM read_parquet('{file.resolve()}')", out_file)
+    ex.export_excel(
+        conn, f"SELECT * FROM read_parquet('{normalize_path(file)}')", out_file
+    )
 
 
 def parquet_to_tsv(
@@ -169,11 +169,8 @@ def excel_to_csv(
     range_=None,
     **kwargs,
 ) -> None:
-    query = (
-        f"SELECT * FROM read_xlsx('{str(file.resolve())}', all_varchar = 'true'"
-        f"{ex._build_excel_options(sheet, range_)})"
-    )
-    conn.sql(query).write_csv(str(out_file.resolve()))
+    query = ex._build_excel_query(file, sheet, range_)
+    conn.sql(query).write_csv(normalize_path(out_file))
 
 
 def excel_to_parquet(
@@ -210,11 +207,8 @@ def excel_to_tsv(
     range_=None,
     **kwargs,
 ) -> None:
-    query = (
-        f"SELECT * FROM read_xlsx('{str(file.resolve())}', all_varchar = 'true'"
-        f"{ex._build_excel_options(sheet, range_)})"
-    )
-    conn.sql(query).write_csv(str(out_file.resolve()), sep="\t")
+    query = ex._build_excel_query(file, sheet, range_)
+    conn.sql(query).write_csv(normalize_path(out_file), sep="\t")
 
 
 def excel_to_txt(
@@ -225,21 +219,11 @@ def excel_to_txt(
     range_=None,
     **kwargs,
 ) -> None:
-    delimiter = kwargs.get("delimiter")
-    if delimiter is None:
-        answer = (
-            input(
-                "For TXT export, choose T for tab separated or C for comma separated: "
-            )
-            .strip()
-            .lower()
-        )
-        delimiter = "\t" if answer == "t" else ","
-    query = (
-        f"SELECT * FROM read_xlsx('{str(file.resolve())}', all_varchar = 'true'"
-        f"{ex._build_excel_options(sheet, range_)})"
+    delimiter = kwargs.get("delimiter") or get_delimiter(
+        prompt_text="For Excel TXT export, choose T (tab) or C (comma): "
     )
-    conn.sql(query).write_csv(str(out_file.resolve()), sep=delimiter)
+    query = ex._build_excel_query(file, sheet, range_)
+    conn.sql(query).write_csv(normalize_path(out_file), sep=delimiter)
 
 
 # --- Conversion lookup dictionary ---

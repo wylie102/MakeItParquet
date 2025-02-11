@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
 """
-CLI Parser module for DuckConvert.
+CLI Interface module for DuckConvert.
 
-Provides functions to parse command-line arguments, file type aliases,
-and helper functions to detect file types and prompt for Excel options.
+Provides functions to parse command-line arguments, handle file type aliases,
+and common user interactions (prompts for output type, Excel options, and TXT delimiters).
 """
 
 import argparse
 from pathlib import Path
 from typing import Optional
 
-# Map common file type names/aliases to canonical names.
+# --- CLI Argument Parsing and File Type Helpers ---
+
 FILE_TYPE_ALIASES = {
     "csv": "csv",
     "txt": "txt",
@@ -34,6 +35,11 @@ def parse_cli_arguments():
     parser.add_argument("-s", "--sheet", help="Excel sheet (name or number)", type=str)
     parser.add_argument("-c", "--range", help="Excel range (e.g., A2:E7)", type=str)
     parser.add_argument("-d", "--delimiter", help="Delimiter for TXT export", type=str)
+    parser.add_argument(
+        "--log-level",
+        help="Set the logging level (e.g., DEBUG, INFO, WARNING)",
+        default="INFO",
+    )
     return parser.parse_args()
 
 
@@ -65,3 +71,47 @@ def prompt_excel_options(file: Path):
         or None
     )
     return sheet, range_
+
+
+# --- User Interaction Functions ---
+
+
+def get_delimiter(
+    existing: str | None = None,
+    prompt_text: str = "Enter delimiter (t for tab, c for comma): ",
+) -> str:
+    """
+    If an existing delimiter is provided, returns it.
+    Otherwise, prompts the user and returns "\t" for 't' or "," for other responses.
+    """
+    if existing is not None:
+        return existing
+    answer = input(prompt_text).strip().lower()
+    return "\t" if answer == "t" else ","
+
+
+def prompt_for_output_type() -> str:
+    """
+    Prompt the user for the desired output format.
+    """
+    return (
+        input("Enter desired output format (csv, parquet, json, excel, tsv, txt): ")
+        .strip()
+        .lower()
+    )
+
+
+def prompt_for_txt_delimiter() -> dict:
+    """
+    Prompt the user for the delimiter used for TXT export.
+    Returns a dict with the key 'delimiter'.
+    """
+    answer = (
+        input("For TXT export, choose t for tab separated or c for comma separated: ")
+        .strip()
+        .lower()
+    )
+    return {"delimiter": "\t" if answer == "t" else ","}
+
+
+# ...any additional helper or interaction functions...

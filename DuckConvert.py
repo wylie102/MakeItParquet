@@ -22,21 +22,17 @@ from pathlib import Path
 import duckdb
 from typing import Optional
 
-from cli_parser import (
+from cli_interface import (
     parse_cli_arguments,
     FILE_TYPE_ALIASES,
     get_file_type_by_extension,
     prompt_excel_options,
+    prompt_for_output_type,  # new import
+    prompt_for_txt_delimiter,  # new import
 )
-from path_manager import (
-    create_path_manager,
-)  # returns a manager with get_files() and output_path attributes
+from path_manager import prepare_parameters, create_path_manager
 from conversions import CONVERSION_FUNCTIONS
-
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
+from excel_utils import load_excel_extension
 
 # Mapping of output file extensions
 EXTENSIONS = {
@@ -50,123 +46,6 @@ EXTENSIONS = {
 
 
 # --- Helper functions for CLI & DuckDB connection ---
-
-
-def determine_output_type(args) -> Optional[str]:
-    """
-    Determine the desired output type from CLI args or by prompting the user.
-    """
-    if args.output_type:
-        out_lower = args.output_type.lower()
-        if out_lower in ["tsv", "txt"]:
-            return out_lower
-        else:
-            try:
-                return FILE_TYPE_ALIASES[out_lower]
-            except KeyError:
-                logging.error(f"Unsupported output format: {args.output_type}")
-                return None
-    else:
-        user_output = (
-            input("Enter desired output format (csv, parquet, json, excel, tsv, txt): ")
-            .strip()
-            .lower()
-        )
-        if user_output in ["tsv", "txt"]:
-            return user_output
-        else:
-            try:
-                return FILE_TYPE_ALIASES[user_output]
-            except KeyError:
-                logging.error(f"Unsupported output format: {user_output}")
-                return None
-
-
-def determine_txt_delimiter(args) -> dict:
-    """
-    Determine delimiter settings for TXT export.
-    """
-    extra_kwargs = {}
-    if args.delimiter is not None:
-        d = args.delimiter.strip().lower()
-        extra_kwargs["delimiter"] = (
-            "\t" if d == "t" else "," if d == "c" else args.delimiter
-        )
-    else:
-        answer = (
-            input(
-                "For TXT export, choose t for tab separated or c for comma separated: "
-            )
-            .strip()
-            .lower()
-        )
-        extra_kwargs["delimiter"] = "\t" if answer == "t" else ","
-    return extra_kwargs
-
-
-def load_excel_extension(conn: duckdb.DuckDBPyConnection) -> bool:
-    """
-    Install and load the Excel extension on the given DuckDB connection.
-    """
-    try:
-        conn.install_extension("excel")
-        conn.load_extension("excel")
-        return True
-    except Exception as e:
-        logging.error(f"Failed to install/load excel extension: {e}")
-        return False
-
-
-def prepare_conversion_parameters(input_path: Path, args, out_type: str):
-    """
-    Return a tuple (files_to_process, output_dest, source_type) based on the input path.
-    For a file, output_dest is None; for a directory, it is provided by the path manager.
-    """
-    if input_path.is_file():
-        if args.input_type:
-            try:
-                source_type = FILE_TYPE_ALIASES[args.input_type.lower()]
-            except KeyError:
-                logging.error(f"Unsupported input format: {args.input_type}")
-                return None
-            logging.info("Number of files to be converted: 1")
-            return ([input_path], None, source_type)
-        else:
-            source_type_optional = get_file_type_by_extension(input_path)
-            if source_type_optional is None:
-                logging.error("Could not determine input type from file extension.")
-                return None
-            logging.info("Number of files to be converted: 1")
-            return ([input_path], None, source_type_optional)
-    elif input_path.is_dir():
-        pm = create_path_manager(input_path, out_type)
-        if pm is None or not (hasattr(pm, "get_files") and hasattr(pm, "output_path")):
-            logging.error("Invalid path manager for directory input.")
-            return None
-        if args.input_type:
-            try:
-                source_type = FILE_TYPE_ALIASES[args.input_type.lower()]
-            except KeyError:
-                logging.error(f"Unsupported input format: {args.input_type}")
-                return None
-            logging.info(f"Input type provided: {source_type}")
-        else:
-            source_type_optional = pm.input_alias
-            if source_type_optional is None:
-                logging.error(
-                    "Could not infer the input type via the path manager for the input directory."
-                )
-                return None
-            source_type = source_type_optional
-            logging.info(f"Detected input extension as: {source_type}")
-        files = pm.get_files(source_type)
-        output_dest = pm.output_path
-        output_dest.mkdir(parents=True, exist_ok=True)
-        logging.info(f"Number of files to be converted: {len(files)}")
-        return (files, output_dest, source_type)
-    else:
-        logging.error(f"Input path '{input_path}' is neither a file nor a directory.")
-        return None
 
 
 def process_file(
@@ -233,15 +112,28 @@ class DuckConvert:
                 f"Input path '{self.input_path}' is neither a file nor a directory."
             )
             raise ValueError("Invalid input path")
-        self.out_type = determine_output_type(self.args)
-        if self.out_type is None:
-            raise ValueError("Invalid output type specified")
-        conversion_params = prepare_conversion_parameters(
-            self.input_path, self.args, self.out_type
+        self.out_type = (
+            self.args.output_type.strip().lower()
+            if self.args.output_type
+            else prompt_for_output_type()
         )
-        if conversion_params is None:
-            raise ValueError("Failed to prepare conversion parameters")
-        self.files_to_process, self.output_dest, self.source_type = conversion_params
+        try:
+            self.out_type = FILE_TYPE_ALIASES[self.out_type]
+        except KeyError:
+            logging.error(f"Unsupported output format: {self.out_type}")
+            raise ValueError("Invalid output type specified")
+        
+        # New, simplified conversion parameter preparation:
+        if self.input_path.is_file():
+            self.files_to_process = [self.input_path]
+            self.output_dest = None
+            self.source_type = self.input_path.suffix.lstrip(".").lower()
+        else:
+            pm = create_path_manager(self.input_path, self.out_type)
+            self.files_to_process = pm.get_files(pm.input_alias)
+            self.output_dest = pm.output_path
+            self.output_dest.mkdir(parents=True, exist_ok=True)
+            self.source_type = pm.input_alias
 
         # Determine Excel options once if needed.
         self.common_excel_sheet = self.args.sheet
@@ -263,7 +155,7 @@ class DuckConvert:
         # Determine extra kwargs for TXT export.
         self.extra_kwargs = {}
         if self.out_type == "txt":
-            self.extra_kwargs = determine_txt_delimiter(self.args)
+            self.extra_kwargs = prompt_for_txt_delimiter()
 
     def run(self):
         """
@@ -305,6 +197,14 @@ class DuckConvert:
 
 def main():
     try:
+        args = parse_cli_arguments()
+        # configure logging based on user input
+        numeric_level = getattr(logging, args.log_level.upper(), None)
+        if not isinstance(numeric_level, int):
+            numeric_level = logging.INFO
+        logging.basicConfig(
+            level=numeric_level, format="%(asctime)s - %(levelname)s - %(message)s"
+        )
         converter = DuckConvert()
         converter.run()
     except Exception as e:

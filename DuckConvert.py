@@ -158,9 +158,7 @@ def prepare_conversion_parameters(input_path: Path, args, out_type: str):
                 )
                 return None
             source_type = source_type_optional
-            logging.info(
-                f"Detected majority input type from path manager: {source_type}"
-            )
+            logging.info(f"Detected input extension as: {source_type}")
         files = pm.get_files(source_type)
         output_dest = pm.output_path
         output_dest.mkdir(parents=True, exist_ok=True)

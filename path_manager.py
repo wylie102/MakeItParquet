@@ -4,13 +4,9 @@ Module for managing file and directory paths for file conversions.
 
 This module defines classes to:
     - Detect if a given path is a file or a directory.
-    - Infer the file type (for processing and for naming) from the file extension.
+    - Infer the file type (for processing and naming) from the file extension.
     - Generate an output file path (by changing the extension) or output directory name
-      (by replacing the file-type "alias" in the directory name) while preserving
-      common capitalization conventions.
-
-Special handling is provided for .txt files: they are processed like CSV files,
-but when naming directories the literal "txt" is used.
+      while preserving common capitalization conventions.
 """
 
 import re
@@ -19,18 +15,12 @@ from typing import Optional, Dict
 from collections import Counter
 
 
-# Added helper function for path normalization.
 def normalize_path(path: Path) -> str:
     """Return the canonical string representation of a file path."""
     return str(path.resolve())
 
 
 class BasePathManager:
-    """
-    Base class for path management.
-    """
-
-    # Mapping for processing: treat .txt as CSV so that conversion code works uniformly.
     ALLOWED_EXT_MAP: Dict[str, str] = {
         ".csv": "csv",
         ".txt": "csv",  # processing: treat txt like csv
@@ -40,12 +30,10 @@ class BasePathManager:
         ".pq": "parquet",
         ".xlsx": "excel",
     }
-
-    # Mapping for naming: keep the literal extension for naming purposes.
     NAMING_EXT_MAP: Dict[str, str] = {
         ".csv": "csv",
-        ".txt": "txt",  # naming: keep txt as txt
-        ".tsv": "tsv",  # added mapping for TSV files
+        ".txt": "txt",
+        ".tsv": "tsv",
         ".json": "json",
         ".parquet": "parquet",
         ".parq": "parquet",
@@ -56,17 +44,12 @@ class BasePathManager:
     def __init__(self, input_path: Path, output_ext: str):
         self.input_path: Path = input_path
         self.output_ext: str = output_ext
-
         self.input_name: str = self.input_path.name
         self.input_dir: Path = self.input_path.parent
-        self.input_alias: Optional[str] = None  # default input_alias attribute
+        self.input_alias: Optional[str] = None
 
     @staticmethod
     def _replace_alias_in_string(text: str, old_alias: str, new_alias: str) -> str:
-        """
-        Replace all occurrences of old_alias in text with new_alias while preserving capitalization.
-        If no occurrence is found, appends the new alias to the text.
-        """
         pattern = re.compile(re.escape(old_alias), re.IGNORECASE)
 
         def replacer(match: re.Match) -> str:
@@ -87,38 +70,21 @@ class BasePathManager:
 
 
 class FilePathManager(BasePathManager):
-    """
-    Class for managing file paths.
-
-    For files, the output path is created by changing the file extension.
-    """
-
     def __init__(self, input_path: Path, output_ext: str):
         super().__init__(input_path, output_ext)
-        # Get the original extension without the dot (preserving its case)
         self.file_ext: str = self.input_path.suffix.lstrip(".")
         self.output_path: Path = self._generate_output_path()
 
     def _generate_output_path(self) -> Path:
-        """
-        Generate the output file path by changing the file's extension to the output_ext.
-        """
         return self.input_path.with_suffix(f".{self.output_ext}")
 
     def get_conversion_params(self):
-        """
-        Return (files, output_dest, source_type).
-        """
         return ([self.input_path], None, self.input_path.suffix.lstrip(".").lower())
 
 
 def infer_majority_alias_in_directory(
     directory: Path, naming_ext_map: Dict[str, str]
 ) -> Optional[str]:
-    """
-    Infer the most common alias among files in the given directory based on naming_ext_map.
-    This function is independent of the directory name.
-    """
     aliases = [
         naming_ext_map[file.suffix.lower()]
         for file in directory.iterdir()
@@ -131,14 +97,8 @@ def infer_majority_alias_in_directory(
 
 
 class DirectoryPathManager(BasePathManager):
-    """
-    Class for managing directory paths.
-    Separates file type inference (via majority alias) from naming logic.
-    """
-
     def __init__(self, input_path: Path, output_ext: str):
         super().__init__(input_path, output_ext)
-        # Use the new helper to infer the majority alias from files, not from the directory name
         self.input_alias = infer_majority_alias_in_directory(
             self.input_path, self.NAMING_EXT_MAP
         )
@@ -146,12 +106,6 @@ class DirectoryPathManager(BasePathManager):
         self.output_path: Path = self.input_dir / self.output_name
 
     def _generate_output_name(self) -> str:
-        """
-        Generate the output directory name.
-        If the inferred alias is found inside the directory name,
-        replace it using _replace_alias_in_string;
-        otherwise, append '_' plus the output extension.
-        """
         if self.input_alias and self.input_alias.lower() in self.input_name.lower():
             return self._replace_alias_in_string(
                 self.input_name, self.input_alias, self.output_ext
@@ -160,10 +114,6 @@ class DirectoryPathManager(BasePathManager):
             return f"{self.input_name}_{self.output_ext}"
 
     def get_files(self, desired_input_type: Optional[str] = None) -> list:
-        """
-        Return a list of file Paths in the directory that have a recognized extension.
-        If `desired_input_type` is provided, only return files whose inferred type matches it.
-        """
         allowed = set(self.ALLOWED_EXT_MAP.keys())
         files = []
         for f in self.input_path.iterdir():
@@ -176,27 +126,12 @@ class DirectoryPathManager(BasePathManager):
         return files
 
     def get_conversion_params(self):
-        """
-        Return (files, output_dest, source_type), ensuring output directory is created.
-        """
         files = self.get_files(self.input_alias)
         self.output_path.mkdir(parents=True, exist_ok=True)
         return (files, self.output_path, self.input_alias)
 
 
-def create_path_manager(input_path: Path, output_ext: str) -> BasePathManager:
-    """
-    Factory function that returns an instance of FilePathManager or DirectoryPathManager
-    based on whether input_path is a file or directory.
-
-    Args:
-        input_path: The Path object for the input file or directory.
-        output_ext: The desired output extension or alias.
-
-    Returns:
-        An instance of FilePathManager (if input_path is a file) or
-        DirectoryPathManager (if input_path is a directory).
-    """
+def create_path_manager(input_path: Path, output_ext: str):
     if input_path.is_file():
         return FilePathManager(input_path, output_ext)
     else:

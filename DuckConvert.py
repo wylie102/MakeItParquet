@@ -1,10 +1,4 @@
 #!/usr/bin/env python3
-# /// script
-# dependencies = [
-#     "duckdb",
-# ]
-# ///
-
 """
 DuckConvert: A conversion tool to convert between popular data storage file types
 (CSV/TXT, JSON, Parquet, Excel) using DuckDB's Python API.
@@ -26,15 +20,15 @@ from cli_interface import (
     parse_cli_arguments,
     FILE_TYPE_ALIASES,
     get_file_type_by_extension,
-    prompt_excel_options,
     prompt_for_txt_delimiter,
     prepare_cli_options,
+    get_excel_options_for_files,
 )
 from path_manager import create_path_manager
-from conversions import CONVERSION_FUNCTIONS
-from excel_utils import load_excel_extension
+from conversions import get_conversion_instance
+from excel_utils import ExcelUtils
 
-# Mapping of output file extensions
+# Mapping of output file extensions for naming purposes.
 EXTENSIONS = {
     "csv": ".csv",
     "tsv": ".tsv",
@@ -43,9 +37,6 @@ EXTENSIONS = {
     "json": ".json",
     "excel": ".xlsx",
 }
-
-
-# --- Helper functions for CLI & DuckDB connection ---
 
 
 def process_file(
@@ -61,11 +52,12 @@ def process_file(
     """
     Process a single file conversion:
       1. Construct the output file (ensuring no overwrite).
-      2. Call the conversion function mapped to (in_type, out_type).
+      2. Instantiate the conversion instance using the factory.
+      3. Run the conversion.
     """
     logging.info(f"Processing file: {file.name}")
 
-    # Determine the output file
+    # Determine the output file path.
     if output_dir is not None:
         output_file = output_dir / (file.stem + EXTENSIONS[out_type])
     else:
@@ -82,56 +74,53 @@ def process_file(
             candidate = output_file.parent / f"{base}_{counter}{ext}"
         output_file = candidate
 
-    conversion_key = (in_type, out_type)
-    if conversion_key not in CONVERSION_FUNCTIONS:
-        logging.error(f"Unsupported conversion: {in_type} to {out_type}")
-        return
-
     try:
-        # Call conversion function with Excel-specific options if needed.
-        if in_type == "excel":
-            CONVERSION_FUNCTIONS[conversion_key](
-                conn, file, output_file, sheet=excel_sheet, range_=excel_range, **kwargs
-            )
-        else:
-            CONVERSION_FUNCTIONS[conversion_key](conn, file, output_file, **kwargs)
+        # Instantiate the proper conversion instance.
+        conversion = get_conversion_instance(
+            conn,
+            src=file,
+            dst=output_file,
+            input_format=in_type,
+            output_format=out_type,
+            sheet=excel_sheet,
+            range_=excel_range,
+            **kwargs,
+        )
+        conversion.run()
         logging.info(f"Converted to {output_file.name}")
     except Exception as e:
         logging.error(f"Error processing file {file.name}: {e}")
 
 
 def convert(args):
+    # Validate CLI options and get the input path and desired output type.
     input_path, out_type = prepare_cli_options(args)
+    # Create a path manager to handle file or directory inputs.
     pm = create_path_manager(input_path, out_type)
-    (files_to_process, output_dest, source_type) = pm.get_conversion_params()
+    files_to_process, output_dest, source_type = pm.get_conversion_params()
 
-    # gather Excel options once
-    common_excel_sheet = args.sheet
-    common_excel_range = args.range
-    if common_excel_sheet is None and common_excel_range is None:
-        excel_files = [
-            f for f in files_to_process if get_file_type_by_extension(f) == "excel"
-        ]
-        if excel_files:
-            logging.info(
-                "Excel options required for processing Excel files, prompting once."
-            )
-            common_excel_sheet, common_excel_range = prompt_excel_options(
-                excel_files[0]
-            )
+    # Gather Excel options
+    if args.sheet is None and args.range is None:
+        common_excel_sheet, common_excel_range = get_excel_options_for_files(
+            files_to_process
+        )
+    else:
+        common_excel_sheet, common_excel_range = args.sheet, args.range
 
     extra_kwargs = {}
     if out_type == "txt":
         extra_kwargs = prompt_for_txt_delimiter()
 
+    # Open an in-memory DuckDB connection.
     with duckdb.connect(database=":memory:") as conn:
-        if not load_excel_extension(conn):
+        if not ExcelUtils.load_extension(conn):
             return
         for f in files_to_process:
             detected = get_file_type_by_extension(f)
             if detected is None:
                 logging.info(f"Skipping file with unsupported extension: {f.name}")
                 continue
+            # Use the CLI input type if provided; otherwise, use auto-detected type.
             in_type = (
                 FILE_TYPE_ALIASES[args.input_type.lower()]
                 if args.input_type

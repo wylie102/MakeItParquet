@@ -8,7 +8,7 @@ and common user interactions (prompts for output type, Excel options, and TXT de
 
 import argparse
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List, Tuple
 import logging
 
 # --- CLI Argument Parsing and File Type Helpers ---
@@ -41,17 +41,15 @@ def parse_cli_arguments():
         help="Set the logging level (e.g., DEBUG, INFO, WARNING)",
         default="INFO",
     )
-
     args = parser.parse_args()
 
-    # Configure logging based on arguments
+    # Configure logging based on arguments.
     numeric_level = getattr(logging, args.log_level.upper(), None)
     if not isinstance(numeric_level, int):
         numeric_level = logging.INFO
     logging.basicConfig(
         level=numeric_level, format="%(asctime)s - %(levelname)s - %(message)s"
     )
-
     return args
 
 
@@ -80,7 +78,6 @@ def prepare_cli_options(args):
     if not (input_path.is_file() or input_path.is_dir()):
         logging.error(f"Input path '{input_path}' is neither a file nor a directory.")
         raise ValueError("Invalid input path")
-
     out_type = (
         args.output_type.strip().lower()
         if args.output_type
@@ -91,7 +88,6 @@ def prepare_cli_options(args):
     except KeyError:
         logging.error(f"Unsupported output format: {out_type}")
         raise ValueError("Invalid output type specified")
-
     return input_path, out_type
 
 
@@ -99,13 +95,9 @@ def prepare_cli_options(args):
 
 
 def get_delimiter(
-    existing: str | None = None,
+    existing: Optional[str] = None,
     prompt_text: str = "Enter delimiter (t for tab, c for comma): ",
 ) -> str:
-    """
-    If an existing delimiter is provided, returns it.
-    Otherwise, prompts the user and returns "\t" for 't' or "," for other responses.
-    """
     if existing is not None:
         return existing
     answer = input(prompt_text).strip().lower()
@@ -113,9 +105,6 @@ def get_delimiter(
 
 
 def prompt_for_output_type() -> str:
-    """
-    Prompt the user for the desired output format.
-    """
     return (
         input("Enter desired output format (csv, parquet, json, excel, tsv, txt): ")
         .strip()
@@ -124,10 +113,6 @@ def prompt_for_output_type() -> str:
 
 
 def prompt_for_txt_delimiter() -> dict:
-    """
-    Prompt the user for the delimiter used for TXT export.
-    Returns a dict with the key 'delimiter'.
-    """
     answer = (
         input("For TXT export, choose t for tab separated or c for comma separated: ")
         .strip()
@@ -148,3 +133,16 @@ def prompt_excel_options(file: Path):
         or None
     )
     return sheet, range_
+
+
+def get_excel_options_for_files(files: List[Path]) -> Tuple[Optional[str], Optional[str]]:
+    """
+    If one or more Excel files are present, prompt the user for Excel sheet and range based on
+    the first Excel file found. Returns a tuple (sheet, range) or (None, None) if no Excel file exists.
+    """
+    # Filter files that are detected as Excel.
+    excel_files = [f for f in files if get_file_type_by_extension(f) == "excel"]
+    if not excel_files:
+        return None, None
+    logging.info("Excel options required for processing Excel files, prompting once.")
+    return prompt_excel_options(excel_files[0])

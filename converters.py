@@ -13,6 +13,213 @@ from excel_utils import ExcelUtils
 from cli_interface import get_delimiter
 from conversion_manager import normalize_path
 
+
+def _generate_import_class(self):
+    """
+    Generate the appropriate input class based on the input path and file extension.
+    """
+    import_class_map = {
+        "csv": CSVInput,
+        "tsv": TsvInput,
+        "txt": TxtInput,
+        "json": JSONInput,
+        "parquet": ParquetInput,
+    }
+
+    if self.input_ext == "excel":
+        if self.output_ext in ("csv", "tsv", "txt"):
+            return ExcelInputUntyped()
+        elif self.output_ext in ("parquet", "json", None):
+            return ExcelInputTyped()
+        else:
+            raise ValueError(
+                f"Unsupported output extension for Excel: {self.output_ext}"
+            )
+
+    if self.input_ext in import_class_map:
+        return import_class_map[self.input_ext]()
+
+    raise ValueError(f"Unsupported input extension: {self.input_ext}")
+
+
+def _generate_export_class(self):
+    """
+    Generate the appropriate output class based on the output path and file extension.
+    """
+    export_class_map = {
+        "csv": CSVOutput,
+        "tsv": TsvOutput,
+        "txt": TxtOutput,
+        "json": JSONOutput,
+        "parquet": ParquetOutput,
+        "excel": ExcelOutput,
+    }
+
+    if self.output_ext in export_class_map:
+        return export_class_map[self.output_ext]()
+
+    raise ValueError(f"Unsupported output extension: {self.output_ext}")
+
+
+# === Input Classes ===
+
+
+class BaseInputConnection:
+    """
+    Base class for input classes.
+    """
+
+    def __init__(self):
+        self.conn = duckdb.connect()
+
+    def import_file(self, path: Path):
+        """
+        Import a file into the duckdb.
+        """
+        pass
+
+
+class CSVInput(BaseInputConnection):
+    """
+    Class for input classes that read CSV files.
+    """
+
+    def __init__(self):
+        super().__init__()
+
+
+class JSONInput(BaseInputConnection):
+    """
+    Class for input classes that read JSON files.
+    """
+
+    def __init__(self):
+        super().__init__()
+        pass
+
+
+class ParquetInput(BaseInputConnection):
+    """
+    Class for input classes that read Parquet files.
+    """
+
+    def __init__(self):
+        super().__init__()
+        pass
+
+
+class TsvInput(CSVInput):
+    """
+    Class for input classes that read TSV files.
+    """
+
+    def __init__(self):
+        super().__init__()
+        pass
+
+
+class TxtInput(CSVInput):
+    """
+    Class for input classes that read TXT files.
+    """
+
+    def __init__(self):
+        super().__init__()
+        pass
+
+
+class ExcelInputUntyped(BaseInputConnection):
+    """
+    Class for input classes that read Excel files.
+    """
+
+    def __init__(self):
+        super().__init__()
+        pass
+
+
+class ExcelInputTyped(ExcelInputUntyped):
+    """
+    Base class for input classes that read Excel files.
+    """
+
+    def __init__(self):
+        super().__init__()
+        pass
+
+
+# === Output Classes ===
+
+
+class BaseOutputConnection:
+    """
+    Base class for output classes.
+    """
+
+    def __init__(self):
+        pass
+
+
+class ParquetOutput(BaseOutputConnection):
+    """
+    Class for output classes that write Parquet files.
+    """
+
+    def __init__(self):
+        super().__init__()
+        pass
+
+
+class JSONOutput(BaseOutputConnection):
+    """
+    Class for output classes that write JSON files.
+    """
+
+    def __init__(self):
+        super().__init__()
+        pass
+
+
+class CSVOutput(BaseOutputConnection):
+    """
+    Class for output classes that write CSV files.
+    """
+
+    def __init__(self):
+        super().__init__()
+        pass
+
+
+class TsvOutput(CSVOutput):
+    """
+    Class for output classes that write TSV files.
+    """
+
+    def __init__(self):
+        super().__init__()
+        pass
+
+
+class TxtOutput(CSVOutput):
+    """
+    Class for output classes that write TXT files.
+    """
+
+    def __init__(self):
+        super().__init__()
+        pass
+
+
+class ExcelOutput(BaseOutputConnection):
+    """
+    Class for output classes that write Excel files.
+    """
+
+    def __init__(self):
+        super().__init__()
+        pass
+
+
 # === Conversion Classes ===
 
 

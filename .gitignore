@@ -11,3 +11,4 @@ wheels/
 
 
 .idea/
+test_threading.py

@@ -42,12 +42,11 @@ class BaseConversionManager:
     """
 
     # Allowed file extensions.
-    ALLOWED_FILE_EXTENSIONS = [
-        ".csv",
+    ALLOWED_FILE_EXTENSIONS = {".csv",
         ".json",
         ".parquet",
-        ".txt",
-    ]
+        ".txt"}
+        
 
     def __init__(self, settings: Settings):
         """
@@ -215,19 +214,12 @@ class DirectoryConversionManager(BaseConversionManager):
         a mapping of file extensions (naming_ext_map).
         Saves dictionary of files of majority alias to list of files with name and size.
         """
-        counts: Dict[str, int] = {}
-        file_groups: Dict[str, List[Tuple[Path, str, int]]] = (
-            {}
-        )  # Store lists of matching files with name and size
-        majority_extension = None  # The alias with the highest count so far.
-        leader_count = 0  # The current highest alias count.
-        second_highest = 0  # The runner-up count.
-
+        
         with os.scandir(self.input_path) as entries:
             remaining_extensions = self.ALLOWED_FILE_EXTENSIONS.copy()
-            for entry in entries:
-                file_data = [self._get_file_info(entry) for entry in entries if entry.is_file() and entry.suffix.lower() in remaining_extensions]
-                
+            file_stat_list = [self._get_file_info(entry) for entry in entries if entry.is_file() and entry.suffix.lower() in remaining_extensions]
+            file_stat_list_dict = 
+            
 
                 # Add file to file_groups if it doesn't exist   
                 if file_ext not in file_groups:

@@ -9,6 +9,7 @@ A conversion tool to convert between popular data storage file types (CSV/TXT/TS
 - **Interactive Options:** Prompts for Excel sheet and range if not specified.
 - **Directory Conversion:** When converting a directory, the tool always creates a subfolder (named after the output type) in the output destination to store the converted files.
 - **Flexible Aliasing:** Easily alias commands (e.g., `dt` for general use and `mip` for "make it Parquet").
+- **Flexible Aliasing:** Easily alias commands (e.g., `dt` for general use and `mip` for "make it Parquet").
 
 ## Prerequisites
 
@@ -30,6 +31,7 @@ uv run /path/to/DataTad.py [OPTIONS]
 The basic usage from the command line is as follows:
 
 ```bash
+Usage: dt <input_path> [OPTIONS]
 Usage: dt <input_path> [OPTIONS]
 
 Arguments:
@@ -55,11 +57,13 @@ Options:
 
   ```bash
   dt /path/to/file.xlsx -i excel -o pq
+  dt /path/to/file.xlsx -i excel -o pq
   ```
 
 - **Convert All Files in a Folder to CSV:**
 
   ```bash
+  dt /path/to/folder -o csv
   dt /path/to/folder -o csv
   ```
 
@@ -111,8 +115,8 @@ source ~/.bashrc
 Add the following lines to your `~/.zshrc`:
 
 ```zsh
-alias dt='uv run /path/to/DataTad.py'
-alias mip='uv run /path/to/DataTad.py -o pq'
+alias dt='uv run /path/to/duckconverter.py'
+alias mip='uv run /path/to/duckconverter.py -o pq'
 ```
 
 Then reload your shell:

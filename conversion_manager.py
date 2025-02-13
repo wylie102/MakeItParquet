@@ -107,7 +107,7 @@ class DirectoryConversionManager(BaseConversionManager):
         else:
             self.input_ext, self.file_dictionary = self._generate_directory_info()
 
-    def _generate_directory_info(  # TODO: (12-Feb-2025) Optimize this function.
+    def _generate_directory_info(  # TODO: (12-Feb-2025) Refactor this function.
         self, input_ext: Optional[str] = None
     ) -> Tuple[str, List[Tuple[Path, str, int]]]:
         """

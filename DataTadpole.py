@@ -5,12 +5,9 @@
 # ]
 # ///
 """
-DuckConvert: A conversion tool to convert between popular data storage file types
-(CSV/TXT, JSON, Parquet, Excel) using DuckDB's Python API.
+DataTadpole: Powered by DuckDB, a conversion tool to convert between popular data storage file types
+(CSV, TSV, TXT, JSON, Parquet, Excel) using DuckDB's Python API.
 
-If the input type is not provided, the file extension is used to auto-detect.
-For Excel files, if no sheet or range has been provided via the command line,
-the tool will prompt for options.
 """
 
 import logging

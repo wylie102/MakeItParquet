@@ -1,5 +1,4 @@
-![DuckConvert Logo](https://github.com/user-attachments/assets/73141b55-e8ab-4739-8c58-6bfe302ed442)
-# DuckConvert
+# DataTadpole
 
 A conversion tool to convert between popular data storage file types (CSV/TXT/TSV, JSON, Parquet, Excel) using DuckDB's Python API.
 
@@ -9,7 +8,7 @@ A conversion tool to convert between popular data storage file types (CSV/TXT/TS
 - **Multiple Formats:** Supports CSV, TXT, TSV, JSON, Parquet, and Excel.
 - **Interactive Options:** Prompts for Excel sheet and range if not specified.
 - **Directory Conversion:** When converting a directory, the tool always creates a subfolder (named after the output type) in the output destination to store the converted files.
-- **Flexible Aliasing:** Easily alias commands (e.g., `dc` for general use and `mip` for "make it Parquet").
+- **Flexible Aliasing:** Easily alias commands (e.g., `dt` for general use and `mip` for "make it Parquet").
 
 ## Prerequisites
 
@@ -23,7 +22,7 @@ Note: DuckDB is not yet available via pip. Please refer to the [official DuckDB 
 Assuming you are using [uv run](https://github.com/your/uv-run) (or a similar tool), you can run the script with:
 
 ```bash
-uv run /path/to/duckconverter.py [OPTIONS]
+uv run /path/to/DataTadpole.py [OPTIONS]
 ```
 
 ## Usage
@@ -31,7 +30,7 @@ uv run /path/to/duckconverter.py [OPTIONS]
 The basic usage from the command line is as follows:
 
 ```bash
-Usage: dc <input_path> [OPTIONS]
+Usage: dt <input_path> [OPTIONS]
 
 Arguments:
   input_path              Path to a file or directory containing files.
@@ -55,19 +54,19 @@ Options:
 - **Convert a Single Excel File to Parquet:**
 
   ```bash
-  dc /path/to/file.xlsx -i excel -o pq
+  dt /path/to/file.xlsx -i excel -o pq
   ```
 
 - **Convert All Files in a Folder to CSV:**
 
   ```bash
-  dc /path/to/folder -o csv
+  dt /path/to/folder -o csv
   ```
 
 - **Convert an Excel File to CSV with a Specified Sheet and Range:**
 
   ```bash
-  dc /path/to/file.xlsx -i excel -s 1 -c A2:E7 -o csv
+  dt /path/to/file.xlsx -i excel -s 1 -c A2:E7 -o csv
   ```
 
 - **Convert Any File Type to Parquet Using the "mip" Alias:**
@@ -79,13 +78,13 @@ Options:
 - **Convert a CSV File to JSON (auto-detecting the input type):**
 
   ```bash
-  dc /path/to/file.csv -o json
+  dt /path/to/file.csv -o json
   ```
 
 - **Convert all Supported Files in a Directory to TXT Format and Specify a Delimiter for TXT Export:**
 
   ```bash
-  dc /path/to/folder -o txt -d t
+  dt /path/to/folder -o txt -d t
   ```
 
 ## Shell Configuration
@@ -97,8 +96,8 @@ To simplify usage, you can set up aliases using `uv run` in your shell configura
 Add the following lines to your `~/.bashrc`:
 
 ```bash
-alias dc='uv run /path/to/duckconverter.py'
-alias mip='uv run /path/to/duckconverter.py -o pq'
+alias dt='uv run /path/to/DataTadpole.py'
+alias mip='uv run /path/to/DataTadpole.py -o pq'
 ```
 
 Then reload your shell:
@@ -112,8 +111,8 @@ source ~/.bashrc
 Add the following lines to your `~/.zshrc`:
 
 ```zsh
-alias dc='uv run /path/to/duckconverter.py'
-alias mip='uv run /path/to/duckconverter.py -o pq'
+alias dt='uv run /path/to/DataTadpole.py'
+alias mip='uv run /path/to/DataTadpole.py -o pq'
 ```
 
 Then reload your shell:
@@ -127,12 +126,12 @@ source ~/.zshrc
 For Fish shell, add the following functions to your `~/.config/fish/config.fish`:
 
 ```fish
-function dc
-    uv run /path/to/duckconverter.py $argv
+function dt
+    uv run /path/to/DataTadpole.py $argv
 end
 
 function mip
-    uv run /path/to/duckconverter.py -o pq $argv
+    uv run /path/to/DataTadpole.py -o pq $argv
 end
 ```
 
@@ -145,7 +144,7 @@ source ~/.config/fish/config.fish
 ## How It Works
 
 1. **Input Processing:**  
-   - If the input path is a file, DuckConvert will convert the file to the specified output format by simply changing the extension.
+   - If the input path is a file, DataTadpole will convert the file to the specified output format by simply changing the extension.
    - If the input is a directory, it will scan the folder to determine the majority file type (using predefined naming mappings) and generate an output directory name accordingly.
 
 2. **File Conversions:**  
@@ -169,7 +168,7 @@ Distributed under the MIT Licence. See `LICENSE` for more information.
 ## Acknowledgements
 
 - Thanks to DuckDB for providing a robust SQL engine for on-the-fly file conversions.
-- Special thanks to contributors and users who helped refine DuckConvert.
+- Special thanks to contributors and users who helped refine DataTadpole.
 
 Happy converting!
 

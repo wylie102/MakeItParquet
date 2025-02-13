@@ -12,11 +12,26 @@ This module defines classes to:
 import logging
 import os
 from pathlib import Path
+import queue
 import threading
 from typing import Dict, Tuple, List, Optional
 
 from cli_interface import Settings
-from converters import _generate_import_class, _generate_export_class
+from converters import (
+    CSVInput,
+    TsvInput,
+    TxtInput,
+    JSONInput,
+    ParquetInput,
+    ExcelInputUntyped,
+    ExcelInputTyped,
+    CSVOutput,
+    TsvOutput,
+    TxtOutput,
+    JSONOutput,
+    ParquetOutput,
+    ExcelOutput,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -26,26 +41,98 @@ class BaseConversionManager:
     Base class for file and directory conversion managers.
     """
 
+    # Allowed file extensions.
+    ALLOWED_FILE_EXTENSIONS = [
+        ".csv",
+        ".json",
+        ".parquet",
+        ".txt",
+    ]
+
+    # Initialize the conversion manager.
     def __init__(self, settings: Settings):
         # Attach settings object.
         self.settings = settings
+        self.logger = settings.logger
 
         # Store parsed CLI arguments.
         self.input_path = self.settings.input_path
         self.input_ext = self.settings.passed_input_format_ext
         self.output_ext = self.settings.passed_output_format_ext
-        self.file_or_dir = self.settings.file_or_dir
 
-        # Initialize import and export classes.
+        # Initialize the import and export queues.
+        self.import_queue: queue.Queue[Tuple[Path, str, int]] = queue.Queue()
+        self.export_queue: queue.Queue[Tuple[Path, str, int]] = queue.Queue()
+
+        # Initialize import and export class variables.
         self.import_class = None
         self.export_class = None
+
+        # File or directory.
+        self.file_or_dir = self.settings.file_or_dir
+        # Subclasses are split by file or directory on instantiation.
+
+    def _generate_import_class(self):
+        """
+        Generate the appropriate input class based on the input path and file extension.
+        """
+        import_class_map = {
+            "csv": CSVInput,
+            "tsv": TsvInput,
+            "txt": TxtInput,
+            "json": JSONInput,
+            "parquet": ParquetInput,
+        }
+
+        if self.input_ext == "excel":
+            if self.output_ext in ("csv", "tsv", "txt"):
+                return ExcelInputUntyped()
+            elif self.output_ext in ("parquet", "json", None):
+                return ExcelInputTyped()
+            else:
+                raise ValueError(
+                    f"Unsupported output extension for Excel: {self.output_ext}"
+                )
+
+        if self.input_ext in import_class_map:
+            return import_class_map[self.input_ext]()
+
+        raise ValueError(f"Unsupported input extension: {self.input_ext}")
+
+    def _generate_export_class(self):
+        """
+        Generate the appropriate output class based on the output path and file extension.
+        """
+        export_class_map = {
+            "csv": CSVOutput,
+            "tsv": TsvOutput,
+            "txt": TxtOutput,
+            "json": JSONOutput,
+            "parquet": ParquetOutput,
+            "excel": ExcelOutput,
+        }
+
+        if self.output_ext in export_class_map:
+            return export_class_map[self.output_ext]()
+
+        raise ValueError(f"Unsupported output extension: {self.output_ext}")
 
     def _determine_output_extension(self):
         """
         Determine the output extension based on the passed output format or prompt the user for one.
         """
         if not self.output_ext:
-            self.output_ext = self.settings.prompt_for_output_format()
+            self.output_ext = self.settings.prompt_for_output_format(self.input_ext)
+
+    def _start_import_queue_handler(self):
+        """
+        Start the import queue handler.
+        """
+        queue_handler = threading.Thread(
+            target=self.import_queue.get, args=(self.input_path,)
+        )
+        queue_handler.start()
+        # TODO: (13-Feb-2025) Check and finish queue handler.
 
 
 class FileConversionManager(BaseConversionManager):
@@ -55,36 +142,47 @@ class FileConversionManager(BaseConversionManager):
 
     def __init__(self, settings: Settings):
         super().__init__(settings)
-        self._convert_single_file()
+        self.check_input_extension()
 
-    def _convert_single_file(self):
-        """
-        Convert a single file.
-        """
-        # Determine the input extension.
-        if not self.input_ext:
-            self.input_ext = self.input_path.suffix.lower()
-
-        # Initialize the import class.
-        self.import_class = _generate_import_class(self)
-
-        # Start file import in asynchronous multiprocessing thread.
-        thread_import = threading.Thread(
-            target=self.import_class.import_file, args=(self.input_path,)
-        )
-        thread_import.start()
+        # Add file to import queue and generate the import class.
+        self.import_queue.put(
+            (self.input_path, self.input_path.name, 1)
+        )  # sham size to satisfy queue requirements
+        self.import_class = self._generate_import_class()
 
         # Determine the output extension.
         self._determine_output_extension()
 
-        # Initialize the export class and start file export.
-        self.export_class = _generate_export_class(self)
-        logger.info(f"Converting {self.input_path.name} to {self.output_ext}.")
-        thread_import.join()
-        self.export_class.export_file(self.input_path, self.output_ext)
-        logger.info(
-            f"File {self.input_path.name} converted to {self.output_ext}.\nConversion complete!"
+        # Generate the export class.
+        self.export_class = self._generate_export_class()
+
+    def check_input_extension(self):
+        """
+        Check the input extension and exit if it is not supported.
+        """
+        try:
+            # Determine the input extension
+            if not self.input_ext:
+                self.input_ext = self.input_path.suffix.lower()
+
+            if self.input_ext not in self.ALLOWED_FILE_EXTENSIONS:
+                self.settings._exit_program(
+                    f"Invalid file extension: {self.input_ext}. Allowed: {self.ALLOWED_FILE_EXTENSIONS}"
+                )
+
+        except Exception as e:
+            self.settings._exit_program(
+                f"Unexpected error in check: {e}", error_type="exception"
+            )
+
+    def _start_file_import(self):
+        """
+        Start the file import in an asynchronous multiprocessing thread.
+        """
+        thread_import = threading.Thread(
+            target=self.import_class.import_file, args=(self.input_path,)
         )
+        thread_import.start()
 
 
 class DirectoryConversionManager(BaseConversionManager):
@@ -182,30 +280,46 @@ class DirectoryConversionManager(BaseConversionManager):
         # Return the majority extension and its corresponding file list directly
         return majority_extension, file_groups[majority_extension]
 
-    # def _replace_alias_in_string(self) -> str:
-    #     pattern = re.compile(re.escape(self.input_ext), re.IGNORECASE)
 
-    # def replacer(match: re.Match) -> str:
-    #     orig = match.group()
-    #     if orig.isupper():
-    #             return self.input_ext.upper()
-    #     elif orig.islower():
-    #             return self.input_ext.lower()
-    #     elif orig[0].isupper() and orig[1:].islower():
-    #         return self.input_ext.capitalize()
-    #     else:
-    #         return self.input_ext
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+# def _replace_alias_in_string(self) -> str:
+#     pattern = re.compile(re.escape(self.input_ext), re.IGNORECASE)
 
-    #     result, count = pattern.subn(replacer, self.input_ext)
-    #     if count == 0:
-    #         result = f"{self.input_ext}"
-    #     return result
+# def replacer(match: re.Match) -> str:
+#     orig = match.group()
+#     if orig.isupper():
+#             return self.input_ext.upper()
+#     elif orig.islower():
+#             return self.input_ext.lower()
+#     elif orig[0].isupper() and orig[1:].islower():
+#         return self.input_ext.capitalize()
+#     else:
+#         return self.input_ext
 
-    # def _generate_output_name(self) -> str:
-    #     if self.input_ext and self.input_ext.lower() in self.input_path.name.lower():
-    #         return self._replace_alias_in_string()
-    #     else:
-    #         return f"{self.input_path.name}_{self.output_ext}"
+#     result, count = pattern.subn(replacer, self.input_ext)
+#     if count == 0:
+#         result = f"{self.input_ext}"
+#     return result
+
+# def _generate_output_name(self) -> str:
+#     if self.input_ext and self.input_ext.lower() in self.input_path.name.lower():
+#         return self._replace_alias_in_string()
+#     else:
+#         return f"{self.input_path.name}_{self.output_ext}"
 
 
 # def generate_output_path(input_path: Path, output_ext: str) -> Path:

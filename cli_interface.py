@@ -11,6 +11,8 @@ from pathlib import Path
 import stat
 from typing import Optional, Tuple, Dict
 import logging
+import queue
+from logging.handlers import QueueHandler, QueueListener
 
 # --- CLI Argument Parsing and File Type Helpers ---
 
@@ -85,11 +87,13 @@ class Settings:
         v: k for k, v in ALIAS_TO_EXTENSION_MAP.items()
     }
 
+
     def __init__(self) -> None:
         """
         Initialize the Settings object.
         """
         self.args = self._parse_cli_arguments()
+        self._configure_logging()
         self.passed_input_format_ext, self.passed_output_format_ext = (
             self._validate_format_inputs()
         )
@@ -130,15 +134,41 @@ class Settings:
         )
         # Parse arguments and create argparse.Namespace object (args).
         args = parser.parse_args()
+        return args
 
-        # Configure logging based on arguments.
-        numeric_level = getattr(logging, args.log_level.upper(), None)
+    def _configure_logging(self):
+        """
+        Configure async logging based on arguments.
+        """
+        self.log_queue = queue.Queue()
+
+        # Create a single logger for the program.
+        self.logger = logging.getLogger("duckconvert")
+        numeric_level = getattr(logging, self.args.log_level.upper(), None)
         if not isinstance(numeric_level, int):
             numeric_level = logging.INFO
-        logging.basicConfig(
-            level=numeric_level, format="%(asctime)s - %(levelname)s - %(message)s"
+
+        # Console handler with module-aware formatting.
+        self.logger.setLevel(numeric_level)
+        console_handler = logging.StreamHandler()
+        formatter = logging.Formatter(
+            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
         )
-        return args
+        console_handler.setFormatter(formatter)
+
+        # Use the queue handler to make logging non-blocking.
+        self.queue_handler = QueueHandler(self.log_queue)
+        self.logger.addHandler(self.queue_handler)
+
+        # Queue listener processes logs in a background thread.
+        self.listener = QueueListener(self.log_queue, console_handler)
+        self.listener.start()
+
+    def _stop_logging(self):
+        """
+        Stops the logging listener before exiting.
+        """
+        self.listener.stop()
 
     def _resolve_path_and_determine_type(self) -> Tuple[Path, str]:
         # Resolve path.
@@ -191,13 +221,20 @@ class Settings:
         # Return input and output extensions.
         return input_ext, output_ext
 
-    def prompt_for_output_format(self) -> str:
+    def prompt_for_output_format(self, input_ext: str) -> str:
         # Prompt for output format.
-        return (
-            input("Enter desired output format (csv, parquet, json, excel, tsv, txt): ")
-            .strip()
-            .lower()
-        )
+        # Validate user input.
+        while True:
+            user_input = input("Enter desired output format (csv, tsv, txt, parquet(pq), json(js), excel(ex)): ").strip().lower()
+            if user_input in self.ALIAS_TO_EXTENSION_MAP and self.ALIAS_TO_EXTENSION_MAP[user_input] != input_ext:
+                output_ext = self.ALIAS_TO_EXTENSION_MAP[user_input]
+                break
+            elif user_input in self.ALIAS_TO_EXTENSION_MAP and self.ALIAS_TO_EXTENSION_MAP[user_input] == input_ext:
+                print("Input and output formats cannot be the same")
+            else:
+                print("Invalid output format. Please try again.")
+        return output_ext
+            
 
     def _determine_excel_options(self):
         # If Excel options are not provided, prompt for them.
@@ -214,3 +251,15 @@ class Settings:
 
             txt_kwargs = prompt_for_txt_delimiter()
             self.args.delimiter = txt_kwargs["delimiter"]
+
+    def _exit_program(self, message, error_type="error"):
+        """
+        Handles program exit with logging and stopping the logging system.
+        """
+        if error_type == "error":
+            self.logger.error(message)
+        elif error_type == "exception":
+            self.logger.exception(message)
+
+        self.settings.stop_logging()  # Ensure logging is stopped before exit
+        exit(1)

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Module for Excel-specific conversion functions for DuckConvert.
+Module for Excel-specific conversion functions for DataTad.
 
 This module provides the ExcelUtils class which contains helper methods
 to build Excel options clauses, build read queries, export Excel files with
@@ -16,7 +16,7 @@ import logging
 import argparse
 from typing import List
 
-from cli_interface import FILE_TYPE_ALIASES, get_file_type_by_extension
+from cli_interface import Settings
 
 
 class ExcelUtils:
@@ -188,9 +188,12 @@ class ExcelUtils:
             (out_type == "excel")
             or (
                 args.input_type
-                and FILE_TYPE_ALIASES[args.input_type.lower()] == "excel"
+                and Settings.ALIAS_TO_EXTENSION_MAP[args.input_type.lower()] == "excel"
             )
-            or any(get_file_type_by_extension(f) == "excel" for f in files_to_process)
+            or any(
+                Settings.ALIAS_TO_EXTENSION_MAP[f.suffix.lower()] == "excel"
+                for f in files_to_process
+            )
         )
         if requires_excel:
             if not ExcelUtils.load_extension(conn):

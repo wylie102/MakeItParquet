@@ -49,8 +49,10 @@ class BaseConversionManager:
         ".txt",
     ]
 
-    # Initialize the conversion manager.
     def __init__(self, settings: Settings):
+        """
+        Initialize the conversion manager.
+        """
         # Attach settings object.
         self.settings = settings
         self.logger = settings.logger
@@ -205,7 +207,7 @@ class DirectoryConversionManager(BaseConversionManager):
         else:
             self.input_ext, self.file_dictionary = self._generate_directory_info()
 
-    def _generate_directory_info(  # TODO: (12-Feb-2025) Refactor this function.
+    def _generate_directory_info(              # TODO: (12-Feb-2025) Refactor this function.
         self, input_ext: Optional[str] = None
     ) -> Tuple[str, List[Tuple[Path, str, int]]]:
         """
@@ -222,23 +224,12 @@ class DirectoryConversionManager(BaseConversionManager):
         second_highest = 0  # The runner-up count.
 
         with os.scandir(self.input_path) as entries:
+            remaining_extensions = self.ALLOWED_FILE_EXTENSIONS.copy()
             for entry in entries:
-                if not entry.is_file():
-                    continue
+                file_data = [self._get_file_info(entry) for entry in entries if entry.is_file() and entry.suffix.lower() in remaining_extensions]
+                
 
-                # Get file path
-                file_path = Path(entry.path)
-
-                # Include only files with recognized extensions.
-                file_ext = file_path.suffix.lower()
-                if file_ext not in self.settings.EXTENSION_TO_ALIAS_MAP:
-                    continue
-
-                # Get file path, size, and name
-                file_size = entry.stat().st_size  # Get file size
-                file_name = entry.name
-
-                # Add file to file_groups if it doesn't exist
+                # Add file to file_groups if it doesn't exist   
                 if file_ext not in file_groups:
                     file_groups[file_ext] = []
                 file_groups[file_ext].append((file_path, file_name, file_size))
@@ -266,21 +257,39 @@ class DirectoryConversionManager(BaseConversionManager):
                     )  # Early return
 
         if majority_extension is None:
-            raise ValueError("No majority alias found")
+            return self.settings._exit_program(
+                "No compatible file types found", error_type="error"
+            )
+        else:
+            # Check for ambiguity: if more than one alias has the top count, ask the user to specify.
+            leaders = [
+                file_ext for file_ext, count in counts.items() if count == leader_count
+            ]
+            if len(leaders) > 1:
+                logger.error(
+                    f"Ambiguous file types found {leaders}. Please specify which one to convert."
+                )
+                majority_extension = self.settings._prompt_for_input_format()
+                return (majority_extension, file_groups[majority_extension])
+            # TODO: (11-Feb-2025) Implement user prompt.
 
-        # Check for ambiguity: if more than one alias has the top count, ask the user to specify.
-        leaders = [
-            file_ext for file_ext, count in counts.items() if count == leader_count
-        ]
-        if len(leaders) > 1:
-            raise ValueError(
-                f"Ambiguous file types found {leaders}. Please specify which one to convert."
-            )  # TODO: (11-Feb-2025) Implement user prompt.
-
-        # Return the majority extension and its corresponding file list directly
-        return majority_extension, file_groups[majority_extension]
+            # Return the majority extension and its corresponding file list directly
+            return majority_extension, file_groups[majority_extension]
 
 
+    def _get_file_info(self, entry):
+        """Returns a dictionary containing full file information."""
+        stat_info = entry.stat()  # Cached metadata
+        path_obj = Path(entry.path)  # Convert string path to Path object
+
+            return {
+                "path": path_obj,
+                "name": entry.name,
+                "size": stat_info.st_size,
+                "ext": path_obj.suffix.lower(),
+            }   
+
+# TODO: (13-Feb-2025) Implement below when needed. DO NOT DELETE.
 #
 #
 #

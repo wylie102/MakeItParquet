@@ -1,4 +1,4 @@
-# DataTadpole
+# DataTad
 
 A conversion tool to convert between popular data storage file types (CSV/TXT/TSV, JSON, Parquet, Excel) using DuckDB's Python API.
 
@@ -22,7 +22,7 @@ Note: DuckDB is not yet available via pip. Please refer to the [official DuckDB 
 Assuming you are using [uv run](https://github.com/your/uv-run) (or a similar tool), you can run the script with:
 
 ```bash
-uv run /path/to/DataTadpole.py [OPTIONS]
+uv run /path/to/DataTad.py [OPTIONS]
 ```
 
 ## Usage
@@ -96,8 +96,8 @@ To simplify usage, you can set up aliases using `uv run` in your shell configura
 Add the following lines to your `~/.bashrc`:
 
 ```bash
-alias dt='uv run /path/to/DataTadpole.py'
-alias mip='uv run /path/to/DataTadpole.py -o pq'
+alias dt='uv run /path/to/DataTad.py'
+alias mip='uv run /path/to/DataTad.py -o pq'
 ```
 
 Then reload your shell:
@@ -111,8 +111,8 @@ source ~/.bashrc
 Add the following lines to your `~/.zshrc`:
 
 ```zsh
-alias dt='uv run /path/to/DataTadpole.py'
-alias mip='uv run /path/to/DataTadpole.py -o pq'
+alias dt='uv run /path/to/DataTad.py'
+alias mip='uv run /path/to/DataTad.py -o pq'
 ```
 
 Then reload your shell:
@@ -127,11 +127,11 @@ For Fish shell, add the following functions to your `~/.config/fish/config.fish`
 
 ```fish
 function dt
-    uv run /path/to/DataTadpole.py $argv
+    uv run /path/to/DataTad.py $argv
 end
 
 function mip
-    uv run /path/to/DataTadpole.py -o pq $argv
+    uv run /path/to/DataTad.py -o pq $argv
 end
 ```
 
@@ -144,7 +144,7 @@ source ~/.config/fish/config.fish
 ## How It Works
 
 1. **Input Processing:**  
-   - If the input path is a file, DataTadpole will convert the file to the specified output format by simply changing the extension.
+   - If the input path is a file, DataTad will convert the file to the specified output format by simply changing the extension.
    - If the input is a directory, it will scan the folder to determine the majority file type (using predefined naming mappings) and generate an output directory name accordingly.
 
 2. **File Conversions:**  
@@ -168,7 +168,7 @@ Distributed under the MIT Licence. See `LICENSE` for more information.
 ## Acknowledgements
 
 - Thanks to DuckDB for providing a robust SQL engine for on-the-fly file conversions.
-- Special thanks to contributors and users who helped refine DataTadpole.
+- Special thanks to contributors and users who helped refine DataTad.
 
 Happy converting!
 

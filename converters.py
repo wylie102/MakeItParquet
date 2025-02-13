@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Module that defines conversion tasks for DuckConvert using a direct factory function.
+Module that defines conversion tasks for DataTad using a direct factory function.
 """
 
 

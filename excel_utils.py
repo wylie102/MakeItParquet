@@ -22,6 +22,19 @@ from cli_interface import Settings
 class ExcelUtils:
     @staticmethod
     def build_excel_options(sheet, range_):
+        """
+        Build an Excel options clause for the read query.
+
+        Constructs an options clause based on the provided sheet and range. If the sheet is
+        an integer, it is converted to the format "Sheet{number}".
+
+        Args:
+            sheet (Union[int, str, None]): The Excel sheet (number or name).
+            range_ (str or None): Cell range (e.g. "A1:C10").
+
+        Returns:
+            str: Options clause to be appended to the read query, or an empty string if no options.
+        """
         parts = []
         if sheet is not None:
             sheet_val = f"Sheet{sheet}" if isinstance(sheet, int) else sheet
@@ -32,6 +45,20 @@ class ExcelUtils:
 
     @staticmethod
     def build_excel_query(file: Path, sheet, range_) -> str:
+        """
+        Build a SQL query to read an Excel file.
+
+        Resolves the file path and builds the options clause before generating a query that
+        reads the file with all columns as varchar.
+
+        Args:
+            file (Path): Path object pointing to the Excel file.
+            sheet (Union[int, str, None]): Excel sheet number or name.
+            range_ (str or None): Excel range string.
+
+        Returns:
+            str: SQL query for reading the Excel file.
+        """
         file_path = str(file.resolve())
         options = ExcelUtils.build_excel_options(sheet, range_)
         return f"SELECT * FROM read_xlsx('{file_path}', all_varchar = 'true'{options})"
@@ -46,6 +73,25 @@ class ExcelUtils:
         fmt: str = "json",
         **kwargs,
     ) -> None:
+        """
+        Export an Excel file to another format using inferred column types.
+
+        Writes a temporary CSV sample to infer table schema, then creates a temporary table,
+        and finally exports the data in the desired format (JSON or Parquet).
+
+        Args:
+            conn (duckdb.DuckDBPyConnection): DuckDB connection instance.
+            file (Path): Excel file to be converted.
+            out_file (Path): Destination output file path.
+            sheet (Union[int, str, None]): Excel sheet specifier.
+            range_ (str or None): Cell range to read.
+            fmt (str): Output format; either "json" or "parquet".
+            **kwargs: Additional keyword arguments.
+
+        Raises:
+            ValueError: If an unsupported output format is specified.
+            Exception: Propagates any exceptions encountered during export.
+        """
         excel_options = ExcelUtils.build_excel_options(sheet, range_)
         file_path = str(file.resolve())
         out_file_path = str(out_file.resolve())
@@ -110,6 +156,22 @@ class ExcelUtils:
         row_limit: int = 1048576,
         margin: int = 100,
     ) -> None:
+        """
+        Export query results to an Excel file, splitting the export if necessary.
+
+        Executes a query and, if the number of rows exceeds the effective limit (row_limit minus margin),
+        splits the export into multiple parts. Each part is exported as a separate Excel file.
+
+        Args:
+            conn (duckdb.DuckDBPyConnection): DuckDB connection instance.
+            base_query (str): SQL query to retrieve data for export.
+            out_file (Path): Destination output file path.
+            row_limit (int, optional): Maximum allowed rows (default is 1,048,576).
+            margin (int, optional): Margin subtracted from row_limit (default is 100).
+
+        Raises:
+            ValueError: If no result is returned from the count query or if any part exceeds the effective limit.
+        """
         out_file_path = str(out_file.resolve())
         count_query = f"SELECT COUNT(*) FROM ({base_query}) AS t"
         result = conn.execute(count_query).fetchone()
@@ -166,6 +228,17 @@ class ExcelUtils:
 
     @staticmethod
     def load_extension(conn: duckdb.DuckDBPyConnection) -> bool:
+        """
+        Load the Excel extension into the DuckDB connection.
+
+        Attempts to install and load the "excel" extension.
+
+        Args:
+            conn (duckdb.DuckDBPyConnection): DuckDB connection instance.
+
+        Returns:
+            bool: True if the extension was successfully loaded, False otherwise.
+        """
         try:
             conn.install_extension("excel")
             conn.load_extension("excel")
@@ -182,7 +255,19 @@ class ExcelUtils:
         files_to_process: List[Path],
     ) -> bool:
         """
-        Check if the Excel extension is required and load it if necessary.
+        Check and load the Excel extension if required.
+
+        Determines if the Excel extension is needed based on the output type, input arguments,
+        or the file types present in the list. If required, attempts to load the extension.
+
+        Args:
+            conn (duckdb.DuckDBPyConnection): DuckDB connection instance.
+            out_type (str): Desired output format.
+            args (argparse.Namespace): CLI arguments.
+            files_to_process (List[Path]): List of file paths to process.
+
+        Returns:
+            bool: True if the Excel extension is successfully loaded or not needed, False otherwise.
         """
         requires_excel = (
             (out_type == "excel")

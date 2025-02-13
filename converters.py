@@ -13,7 +13,13 @@ import duckdb
 
 class BaseInputConnection:
     """
-    Base class for input classes.
+    Base class for input connections to DuckDB.
+
+    Provides the foundation for all input classes with a DuckDB connection
+    and basic import functionality.
+
+    Attributes:
+        conn (duckdb.DuckDBPyConnection): DuckDB connection instance
     """
 
     def __init__(self):
@@ -28,7 +34,10 @@ class BaseInputConnection:
 
 class CSVInput(BaseInputConnection):
     """
-    Class for input classes that read CSV files.
+    Handles importing CSV files into DuckDB.
+
+    Provides specialized functionality for reading and processing CSV format files
+    using DuckDB's CSV reader.
     """
 
     def __init__(self):
@@ -37,7 +46,10 @@ class CSVInput(BaseInputConnection):
 
 class JSONInput(BaseInputConnection):
     """
-    Class for input classes that read JSON files.
+    Handles importing JSON files into DuckDB.
+
+    Provides specialized functionality for reading and processing JSON format files,
+    handling nested structures and arrays.
     """
 
     def __init__(self):
@@ -47,7 +59,10 @@ class JSONInput(BaseInputConnection):
 
 class ParquetInput(BaseInputConnection):
     """
-    Class for input classes that read Parquet files.
+    Handles importing Parquet files into DuckDB.
+
+    Provides specialized functionality for reading Apache Parquet format files,
+    preserving column types and handling compression.
     """
 
     def __init__(self):
@@ -57,7 +72,10 @@ class ParquetInput(BaseInputConnection):
 
 class TsvInput(CSVInput):
     """
-    Class for input classes that read TSV files.
+    Handles importing TSV (Tab-Separated Values) files into DuckDB.
+
+    Extends CSVInput to handle tab-delimited files specifically, using
+    tab character as the default delimiter.
     """
 
     def __init__(self):
@@ -67,7 +85,10 @@ class TsvInput(CSVInput):
 
 class TxtInput(CSVInput):
     """
-    Class for input classes that read TXT files.
+    Handles importing generic text files into DuckDB.
+
+    Extends CSVInput to handle text files with configurable delimiters,
+    supporting both tab and comma-separated formats.
     """
 
     def __init__(self):
@@ -77,7 +98,10 @@ class TxtInput(CSVInput):
 
 class ExcelInputUntyped(BaseInputConnection):
     """
-    Class for input classes that read Excel files.
+    Handles importing Excel files into DuckDB with string typing.
+
+    Reads Excel files treating all columns as strings (VARCHAR),
+    suitable for text-based output formats.
     """
 
     def __init__(self):
@@ -87,7 +111,10 @@ class ExcelInputUntyped(BaseInputConnection):
 
 class ExcelInputTyped(ExcelInputUntyped):
     """
-    Base class for input classes that read Excel files.
+    Handles importing Excel files into DuckDB with type inference.
+
+    Extends ExcelInputUntyped to infer and preserve column data types,
+    suitable for Parquet and JSON output formats.
     """
 
     def __init__(self):
@@ -100,7 +127,10 @@ class ExcelInputTyped(ExcelInputUntyped):
 
 class BaseOutputConnection:
     """
-    Base class for output classes.
+    Base class for output connections from DuckDB.
+
+    Provides the foundation for all output classes with basic
+    export functionality.
     """
 
     def __init__(self):
@@ -109,7 +139,10 @@ class BaseOutputConnection:
 
 class ParquetOutput(BaseOutputConnection):
     """
-    Class for output classes that write Parquet files.
+    Handles exporting data to Parquet files.
+
+    Provides functionality for writing data to Apache Parquet format,
+    preserving column types and applying compression.
     """
 
     def __init__(self):
@@ -119,7 +152,10 @@ class ParquetOutput(BaseOutputConnection):
 
 class JSONOutput(BaseOutputConnection):
     """
-    Class for output classes that write JSON files.
+    Handles exporting data to JSON files.
+
+    Provides functionality for writing data to JSON format,
+    handling nested structures and arrays.
     """
 
     def __init__(self):
@@ -129,7 +165,10 @@ class JSONOutput(BaseOutputConnection):
 
 class CSVOutput(BaseOutputConnection):
     """
-    Class for output classes that write CSV files.
+    Handles exporting data to CSV files.
+
+    Provides functionality for writing data to comma-separated format,
+    with options for custom delimiters and quoting.
     """
 
     def __init__(self):
@@ -139,7 +178,10 @@ class CSVOutput(BaseOutputConnection):
 
 class TsvOutput(CSVOutput):
     """
-    Class for output classes that write TSV files.
+    Handles exporting data to TSV files.
+
+    Extends CSVOutput to write tab-separated files specifically,
+    using tab character as the delimiter.
     """
 
     def __init__(self):
@@ -149,7 +191,10 @@ class TsvOutput(CSVOutput):
 
 class TxtOutput(CSVOutput):
     """
-    Class for output classes that write TXT files.
+    Handles exporting data to text files.
+
+    Extends CSVOutput to write delimited text files with configurable
+    separators, supporting both tab and comma-separated formats.
     """
 
     def __init__(self):
@@ -159,7 +204,10 @@ class TxtOutput(CSVOutput):
 
 class ExcelOutput(BaseOutputConnection):
     """
-    Class for output classes that write Excel files.
+    Handles exporting data to Excel files.
+
+    Provides functionality for writing data to Excel format (.xlsx),
+    handling multiple sheets and basic formatting.
     """
 
     def __init__(self):

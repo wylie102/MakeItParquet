@@ -4,9 +4,9 @@
 
 ### Settings class
 
-- Class to parse CLI arguments and store them, also creates path object from the input path provided, and discerns and stores whether targat object is a file or directory.
-
-- Settings also initiates an asynchronous logging process.
+- Parses CLI arguments and resolves the input path.
+- Discerns whether the target is a file or directory.
+- Initialises asynchronous logging for the application.
 
 ## DataTad.py
 
@@ -14,30 +14,40 @@ Settings class is imported from cli_interface.py
 
 ### Small main function
 
-- Creates an instance of the Settings class.
-
-- The settings class parses the CLI arguments, identifies the target file/folder and stores information about it.
-
-- Next main calls create_conversion_manager and passes the settings instance into it. The correct conversion manager is created based on wether the target of the input path is a file or a directory.
+- Instantiates the Settings class to parse CLI arguments and determine the target type.
+- Calls `create_conversion_manager` (which chooses either the file or directory conversion manager).
+- Triggers the conversion process.
 
 ## conversion_manager.py
 
-### ConversionManagerClass (and sub classes)
+### Conversion Manager and Subclasses
 
-- The conversion manager will scan and store information about the file(s) and use this to populate an input queue and an output queue and call the correct import and export classes.
+- **BaseConversionManager**:
+  - Handles common operations such as format validation, queue management, and dynamic generation of input/output classes.
+- **FileConversionManager**:
+    - Manages conversion for a single file. Validates the file extension and starts an asynchronous import process.
+- **DirectoryConversionManager**:
+    - Scans directories to group and order files (e.g. by size) for batch conversion.
 
-- Import is started and the user input on the output format is requested asynchronously. Once output format is selected and validated output commands are queued and executed.
-
-- Only one import or one export process is happening in DuckDB at any given time.
-
-- Once the last file is converted the connection to DuckDB is terminated,  any temporary files are deleded, and logging is terminated before exit.
+*Note:* Legacy code is commented out to preserve ideas for future features as the design shifts toward a more robust object-oriented framework.
 
 ## converters.py
 
-- contains various import and export classes needed for various import/export combinations. These should work of connections to DuckDB created as conn objects.
+### Conversion Classes and Factories
 
-- Excel specific functions which are more complex are handled in excel_utilities.py
+- Defines the base connection classes:
+  - **BaseInputConnection** and **BaseOutputConnection** encapsulate the DuckDB connection logic.
+- Provides specialised classes for each format:
+  - Input: CSVInput, JSONInput, ParquetInput, TsvInput, TxtInput, ExcelInputUntyped, and ExcelInputTyped.
+    - Output: CSVOutput, JSONOutput, ParquetOutput, TsvOutput, TxtOutput, and ExcelOutput.
+- Legacy conversion approaches are present as commented-out code and will be integrated into the new OOP design as refactoring proceeds.
 
 ## excel_utilities.py
 
-- Contains the specific functions and classes needed to handle excel input and output.
+### Excel Utilities
+
+- Provides functions to build Excel options clauses and SQL queries for reading Excel files.
+- Offers functions to export Excel files while handling type inference and paginated exports.
+- Manages loading of the Excel extension for DuckDB.
+
+These utilities support the converters and are key to handling the complexity of Excel interactions.

@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
 """
-Module for managing file and directory paths for file conversions.
+Module for managing file and directory conversions.
 
-This module defines classes to:
-    - Detect if a given path is a file or a directory.
-    - Infer the file type (for processing and naming) from the file file_ext.
-    - Generate an output file path (by changing the file_ext) or output directory name
-      while preserving common capitalization conventions.
+This module provides classes to manage the conversion of files and directories:
+- BaseConversionManager: Base class with common functionality
+- FileConversionManager: Handles single file conversions 
+- DirectoryConversionManager: Handles directory conversions
+
+The managers handle:
+- Validating input/output formats
+- Managing conversion queues
+- Coordinating import/export operations
 """
 
 import logging
@@ -39,6 +43,24 @@ logger = logging.getLogger(__name__)
 class BaseConversionManager:
     """
     Base class for file and directory conversion managers.
+    
+    Provides common functionality for managing file conversions including:
+    - Queue management for imports/exports
+    - Input/output format validation
+    - Import/export class generation
+    
+    Attributes:
+        ALLOWED_FILE_EXTENSIONS (set): Set of allowed file extensions (.csv, .json, etc)
+        settings (Settings): Settings object containing CLI arguments and config
+        logger (Logger): Logger instance for this manager
+        input_path (Path): Path to input file/directory
+        input_ext (str): Input file extension/format
+        output_ext (str): Output file extension/format
+        import_queue (Queue): Queue for files to be imported
+        export_queue (Queue): Queue for files to be exported
+        import_class (BaseInputConnection): Class instance for handling imports
+        export_class (BaseOutputConnection): Class instance for handling exports
+        file_or_dir (str): Whether input path is a 'file' or 'dir'
     """
 
     # Allowed file extensions.
@@ -75,7 +97,16 @@ class BaseConversionManager:
 
     def _generate_import_class(self):
         """
-        Generate the appropriate input class based on the input path and file extension.
+        Create appropriate input class based on file extension.
+        
+        Determines and instantiates the correct input class based on the input
+        file extension. Handles special cases for Excel files based on output format.
+        
+        Returns:
+            BaseInputConnection: Instance of appropriate input class for the file type
+            
+        Raises:
+            ValueError: If input extension is not supported
         """
         import_class_map = {
             "csv": CSVInput,
@@ -102,7 +133,16 @@ class BaseConversionManager:
 
     def _generate_export_class(self):
         """
-        Generate the appropriate output class based on the output path and file extension.
+        Create appropriate output class based on output format.
+        
+        Determines and instantiates the correct output class based on the desired
+        output format.
+        
+        Returns:
+            BaseOutputConnection: Instance of appropriate output class for the format
+            
+        Raises:
+            ValueError: If output format is not supported
         """
         export_class_map = {
             "csv": CSVOutput,
@@ -120,14 +160,21 @@ class BaseConversionManager:
 
     def _determine_output_extension(self):
         """
-        Determine the output extension based on the passed output format or prompt the user for one.
+        Set the output file extension.
+        
+        If output extension is not already set in settings, prompts user to select
+        one. Validates that output format differs from input format.
         """
         if not self.output_ext:
             self.output_ext = self.settings.prompt_for_output_format(self.input_ext)
 
     def _start_import_queue_handler(self):
         """
-        Start the import queue handler.
+        Start asynchronous processing of the import queue.
+        
+        Creates and starts a thread to process files in the import queue.
+        Files are imported one at a time to avoid overwhelming DuckDB.
+        The queue handler continues running until all files are processed.
         """
         queue_handler = threading.Thread(
             target=self.import_queue.get, args=(self.input_path,)
@@ -138,7 +185,12 @@ class BaseConversionManager:
 
 class FileConversionManager(BaseConversionManager):
     """
-    Class for managing file conversions.
+    Manager for single file conversions.
+    
+    Handles the conversion of a single input file to the desired output format.
+    
+    Attributes:
+        Inherits all attributes from BaseConversionManager
     """
 
     def __init__(self, settings: Settings):
@@ -159,10 +211,17 @@ class FileConversionManager(BaseConversionManager):
 
     def check_input_extension(self):
         """
-        Check the input extension and exit if it is not supported.
+        Validate the input file extension.
+        
+        Checks if the input file extension is supported. If the input extension is not
+        set, it is inferred from the file path's suffix. If the extension is not allowed,
+        the program exits after logging an error.
+        
+        Raises:
+            SystemExit: If file extension is not in the ALLOWED_FILE_EXTENSIONS.
         """
         try:
-            # Determine the input extension
+            # Determine the input extension.
             if not self.input_ext:
                 self.input_ext = self.input_path.suffix.lower()
 
@@ -178,7 +237,10 @@ class FileConversionManager(BaseConversionManager):
 
     def _start_file_import(self):
         """
-        Start the file import in an asynchronous multiprocessing thread.
+        Start the asynchronous file import process.
+        
+        Spawns a new thread to call the import_file method of the input class with the input path.
+        This allows file import to occur concurrently without blocking the main thread.
         """
         thread_import = threading.Thread(
             target=self.import_class.import_file, args=(self.input_path,)
@@ -188,7 +250,14 @@ class FileConversionManager(BaseConversionManager):
 
 class DirectoryConversionManager(BaseConversionManager):
     """
-    Class for managing directory conversions.
+    Manager for directory conversions.
+    
+    Handles the conversion of multiple files in a directory.
+    
+    Attributes:
+        Inherits all attributes from BaseConversionManager
+        file_dictionary (List[Tuple[Path, str, int]]): List of files to convert
+            Each tuple contains (file_path, file_name, file_size)
     """
 
     def __init__(self, settings: Settings):
@@ -198,21 +267,44 @@ class DirectoryConversionManager(BaseConversionManager):
         self._convert_directory()
 
     def _order_files_by_size(self):
+        """
+        Sort the file dictionary by file size.
+        
+        Orders files from smallest to largest to optimize processing.
+        """
         self.file_dictionary.sort(key=lambda x: x[2])
 
     def _convert_directory(self):
+        """
+        Initialize directory conversion.
+        
+        Determines input format if not specified and populates file dictionary.
+        """
         if self.input_ext:
             self.file_dictionary = self._generate_directory_info(self.input_ext)[1]
         else:
             self.input_ext, self.file_dictionary = self._generate_directory_info()
 
-    def _generate_directory_info(              # TODO: (12-Feb-2025) Refactor this function.
-        self, input_ext: Optional[str] = None
-    ) -> Tuple[str, List[Tuple[Path, str, int]]]:
+    def _generate_directory_info(self, input_ext: Optional[str] = None) -> Tuple[str, List[Tuple[Path, str, int]]]:
         """
-        Determine and return the majority alias for files in the directory based on
-        a mapping of file extensions (naming_ext_map).
-        Saves dictionary of files of majority alias to list of files with name and size.
+        Generate information about files in the directory.
+        
+        Scans the directory for files matching the input extension or determines the most common
+        file type if no extension is specified. Groups files by extension and validates compatibility.
+        
+        Args:
+            input_ext (Optional[str]): File extension to filter by (e.g. '.csv', '.json')
+            
+        Returns:
+            Tuple containing:
+                - str: Most common file extension or specified input extension
+                - List[Tuple[Path, str, int]]: List of tuples containing:
+                    - Path: Full path to file
+                    - str: File name
+                    - int: File size in bytes
+                
+        Raises:
+            SystemExit: If no compatible files are found in directory
         """
         
         with os.scandir(self.input_path) as entries:
@@ -269,8 +361,23 @@ class DirectoryConversionManager(BaseConversionManager):
             return majority_extension, file_groups[majority_extension]
 
 
-    def _get_file_info(self, entry):
-        """Returns a dictionary containing full file information."""
+    def _get_file_info(self, entry) -> Dict:
+        """
+        Extract metadata from a directory entry.
+        
+        Gets file information including path, name, size and extension from
+        a directory entry object.
+        
+        Args:
+            entry (os.DirEntry): Directory entry object from os.scandir()
+            
+        Returns:
+            Dict containing:
+                - path (Path): Full path to file
+                - name (str): File name
+                - size (int): File size in bytes
+                - ext (str): Lowercase file extension
+        """
         stat_info = entry.stat()  # Cached metadata
         path_obj = Path(entry.path)  # Convert string path to Path object
 

@@ -22,6 +22,8 @@ from typing import Dict, Tuple, List, Optional
 
 from cli_interface import Settings
 from converters import (
+    BaseInputConnection,
+    BaseOutputConnection,
     CSVInput,
     TsvInput,
     TxtInput,
@@ -75,24 +77,25 @@ class BaseConversionManager:
         Initialize the conversion manager.
         """
         # Attach settings object.
-        self.settings = settings
-        self.logger = settings.logger
+        self.settings: Settings = settings
+        self.settings.conversion_manager = self
+        self.logger: logging.Logger = settings.logger
 
-        # Store parsed CLI arguments.
-        self.input_path = self.settings.input_path
-        self.input_ext = self.settings.passed_input_format_ext
-        self.output_ext = self.settings.passed_output_format_ext
+        # Store parsed CLI arguments by copying from Settings.
+        self.input_path: Path = self.settings.input_path
+        self.input_ext: str = self.settings.passed_input_format_ext
+        self.output_ext: str = self.settings.passed_output_format_ext
 
-        # Initialize the import and export queues.
+        # Initialise the import and export queues.
         self.import_queue: queue.Queue[Tuple[Path, str, int]] = queue.Queue()
         self.export_queue: queue.Queue[Tuple[Path, str, int]] = queue.Queue()
 
-        # Initialize import and export class variables.
-        self.import_class = None
-        self.export_class = None
+        # Initialise import and export class variables.
+        self.import_class: Optional[BaseInputConnection] = None
+        self.export_class: Optional[BaseOutputConnection] = None
 
         # File or directory.
-        self.file_or_dir = self.settings.file_or_dir
+        self.file_or_dir: str = self.settings.file_or_dir
         # Subclasses are split by file or directory on instantiation.
 
     def _generate_import_class(self):
@@ -117,9 +120,9 @@ class BaseConversionManager:
         }
 
         if self.input_ext == "excel":
-            if self.output_ext in ("csv", "tsv", "txt"):
+            if self.output_ext in (".csv", ".tsv", ".txt"):
                 return ExcelInputUntyped()
-            elif self.output_ext in ("parquet", "json", None):
+            elif self.output_ext in (".parquet", ".json", None):
                 return ExcelInputTyped()
             else:
                 raise ValueError(
@@ -195,13 +198,13 @@ class FileConversionManager(BaseConversionManager):
 
     def __init__(self, settings: Settings):
         super().__init__(settings)
-        self.check_input_extension()
-
+        self._check_input_extension()
+        self.import_class = self._generate_import_class()
         # Add file to import queue and generate the import class.
         self.import_queue.put(
             (self.input_path, self.input_path.name, 1)
         )  # sham size to satisfy queue requirements
-        self.import_class = self._generate_import_class()
+        
 
         # Determine the output extension.
         self._determine_output_extension()
@@ -209,7 +212,7 @@ class FileConversionManager(BaseConversionManager):
         # Generate the export class.
         self.export_class = self._generate_export_class()
 
-    def check_input_extension(self):
+    def _check_input_extension(self):
         """
         Validate the input file extension.
         
@@ -220,19 +223,13 @@ class FileConversionManager(BaseConversionManager):
         Raises:
             SystemExit: If file extension is not in the ALLOWED_FILE_EXTENSIONS.
         """
-        try:
-            # Determine the input extension.
-            if not self.input_ext:
-                self.input_ext = self.input_path.suffix.lower()
+        # Determine the input extension.
+        if not self.input_ext:
+            self.input_ext = self.input_path.suffix.lower()
 
-            if self.input_ext not in self.ALLOWED_FILE_EXTENSIONS:
-                self.settings._exit_program(
-                    f"Invalid file extension: {self.input_ext}. Allowed: {self.ALLOWED_FILE_EXTENSIONS}"
-                )
-
-        except Exception as e:
+        if self.input_ext not in self.ALLOWED_FILE_EXTENSIONS:
             self.settings._exit_program(
-                f"Unexpected error in check: {e}", error_type="exception"
+                f"Invalid file extension: {self.input_ext}. Allowed: {self.ALLOWED_FILE_EXTENSIONS}"
             )
 
     def _start_file_import(self):
@@ -355,7 +352,7 @@ class DirectoryConversionManager(BaseConversionManager):
                 )
                 majority_extension = self.settings._prompt_for_input_format()
                 return (majority_extension, file_groups[majority_extension])
-            # TODO: (11-Feb-2025) Implement user prompt.
+            # TODO: (11-Feb-2025) Implement user prompt for input extension.
 
             # Return the majority extension and its corresponding file list directly
             return majority_extension, file_groups[majority_extension]

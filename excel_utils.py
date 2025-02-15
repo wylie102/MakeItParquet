@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Module for Excel-specific conversion functions for DataTad.
+Module for Excel-specific conversion functions for Make-it-Parquet!.
 
 This module provides the ExcelUtils class which contains helper methods
 to build Excel options clauses, build read queries, export Excel files with

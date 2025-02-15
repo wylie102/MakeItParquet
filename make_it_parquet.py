@@ -5,7 +5,7 @@
 # ]
 # ///
 """
-DataTad: A file conversion tool powered by DuckDB.
+Make-it-Parquet!: A file conversion tool powered by DuckDB.
 """
 
 
@@ -35,7 +35,7 @@ def create_conversion_manager(settings: Settings):
 
 def main():
     """
-    Main entry point for the DataTad conversion tool.
+    Main entry point for the Make-it-Parquet! conversion tool.
 
     Initialises the application settings and triggers the conversion process by creating
     the appropriate conversion manager.

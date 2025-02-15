@@ -2,7 +2,7 @@ version = 1
 requires-python = ">=3.13"
 
 [[package]]
-name = "duckconvert"
+name = "Make-it-Parquet!"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [

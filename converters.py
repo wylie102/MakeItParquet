@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Module that defines conversion tasks for DataTad using a direct factory function.
+Module that defines conversion tasks for Make-it-Parquet! using a direct factory function.
 """
 
 

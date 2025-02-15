@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-CLI Interface module for DuckConvert.
+CLI Interface module for Make-it-Parquet!.
 
 This module provides:
 - CLI argument parsing and validation
@@ -186,7 +186,7 @@ class Settings:
         """
         # Parse CLI arguments.
         parser = argparse.ArgumentParser(
-            description="DataTad: Convert data files using DuckDB"
+            description="Make-it-Parquet!: Conversion of data files powered by DuckDB"
         )
         # Input path.
         parser.add_argument(
@@ -229,7 +229,7 @@ class Settings:
         self.log_queue = queue.Queue()
 
         # Create a single logger for the program.
-        self.logger = logging.getLogger("DataTad")
+        self.logger = logging.getLogger("Make-it-Parquet!")
         numeric_level = getattr(logging, self.args.log_level.upper(), None)
         if not isinstance(numeric_level, int):
             numeric_level = logging.INFO
@@ -342,7 +342,7 @@ class Settings:
         # Return input and output extensions.
         return input_ext, output_ext
 
-    def prompt_for_output_format(self) -> str:
+    def prompt_for_output_format(self):
         """
         Prompt user for output format, ensuring it differs from input.
 
@@ -368,6 +368,7 @@ class Settings:
                 and self.ALIAS_TO_EXTENSION_MAP[output_format] != input_ext
             ):
                 output_ext = self.ALIAS_TO_EXTENSION_MAP[output_format]
+                self.conversion_manager.output_ext = output_ext
                 self.output_format_from_prompt_flag = 1
                 logging.info(f"Output format set to: {output_ext}")
                 break
@@ -386,11 +387,11 @@ class Settings:
                         f"Conflict detected: Output format '{output_ext}' is the same as the auto-detected input format '{input_ext}'."
                     )
                     input_answer = input(
-                        "The input format was auto-detected. Would you like to change the detected input format? (y/n): "
+                        "The input format was auto-detected. Would you like to change the from the detected input format? (y/n): "
                     )
                     # Wishes to change from detected input extension.
                     if input_answer.lower() == "y":
-                        self._prompt_for_input_format()  # TODO (14-Feb-2025): Need to implement a way update the input extension in the conversion manager.
+                        self._prompt_for_input_format()
                     # Wishes to keep detected input extension.
                     else:
                         logging.info("Please enter a different output format.")
@@ -400,11 +401,11 @@ class Settings:
                     logging.error(
                         f"Conflict detected: Output format '{output_ext}' is the same as the user-provided input format '{input_ext}'."
                     )
-                    output_answer = input(
+                    input_answer = input(
                         "The input format was provided directly. Would you like to change the input format? (y/n): "
                     )
                     # Wishes to change from passed in input extension.
-                    if output_answer.lower() == "y":
+                    if input_answer.lower() == "y":
                         self._prompt_for_input_format()
                     # Wishes to keep passed in input extension.
                     else:
@@ -412,18 +413,35 @@ class Settings:
                         continue
             else:
                 logging.error(
-                    "Invalid output format. Please enter a valid output format."
+                    "Invalid output format. Please enter a valid output format (note: formats do not include the '.' ."
                 )
                 continue
-        return output_ext
 
     def _prompt_for_input_format(
         self,
-    ):  # TODO: (14-Feb-2025) Implement prompt for input format.
+    ):
         """
         Prompt user for input format.
         """
-        pass
+        while True:
+            input_format = (
+                input(
+                    "Enter desired input format (csv, tsv, txt, parquet(pq), json(js), excel(ex)): "
+                )
+                .strip()
+                .lower()
+            )
+            if input_format in self.ALIAS_TO_EXTENSION_MAP:
+                input_ext = self.ALIAS_TO_EXTENSION_MAP[input_format]
+                self.input_ext_from_prompt_flag = 1
+                logging.info(f"Input extension set to: {input_ext}")
+                self.conversion_manager.input_ext = input_ext
+                break
+            else:
+                logging.error(
+                    "Invalid input format. Please enter a valid input format (note: formats do not include the '.' ."
+                )
+                continue
 
     def _determine_excel_options(self):
         """

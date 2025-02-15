@@ -1,5 +1,5 @@
 [project]
-name = "DataTad"
+name = "Make-it-Parquet!"
 version = "0.1.0"
 description = "A file conversion tool powered by DuckDB."
 readme = "README.md"

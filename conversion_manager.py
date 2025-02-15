@@ -13,31 +13,15 @@ The managers handle:
 - Coordinating import/export operations
 """
 
-import logging
+from user_interface import logger
 import os
 from pathlib import Path
 import queue
 from typing import Dict, Tuple, Optional, Set, Union
 from collections import defaultdict
 
-from cli_interface import Settings
-from converters import (
-    BaseInputConnection,
-    BaseOutputConnection,
-    CSVInput,
-    TsvInput,
-    TxtInput,
-    JSONInput,
-    ParquetInput,
-    ExcelInputUntyped,
-    ExcelInputTyped,
-    CSVOutput,
-    TsvOutput,
-    TxtOutput,
-    JSONOutput,
-    ParquetOutput,
-    ExcelOutput,
-)
+from user_interface.settings import Settings
+import converters as conv
 
 
 class BaseConversionManager:
@@ -63,9 +47,6 @@ class BaseConversionManager:
         file_or_dir (str): Whether input path is a 'file' or 'dir'
     """
 
-    # Allowed file extensions.
-    ALLOWED_FILE_EXTENSIONS = {".csv", "tsv", "txt", ".json", ".parquet", ".xlsx"}
-
     def __init__(self, settings: Settings):
         """
         Initialize the conversion manager.
@@ -73,7 +54,7 @@ class BaseConversionManager:
         # Attach settings object.
         self.settings: Settings = settings
         self.settings.conversion_manager = self  # BaseConversionManager
-        self.logger: Optional[logging.Logger] = settings.logger
+        self.logger: Optional[logger.Logger] = settings.logger
 
         # Store parsed CLI arguments by copying from Settings.
         self.input_path: Path = self.settings.input_path
@@ -85,8 +66,8 @@ class BaseConversionManager:
         self.export_queue: queue.Queue[Tuple[Path, str, int]] = queue.Queue()
 
         # Initialise import and export class variables.
-        self.import_class: Optional[BaseInputConnection] = None
-        self.export_class: Optional[BaseOutputConnection] = None
+        self.import_class: Optional[conv.BaseInputConnection] = None
+        self.export_class: Optional[conv.BaseOutputConnection] = None
 
         # File or directory.
         self.file_or_dir: str = self.settings.file_or_dir
@@ -135,13 +116,6 @@ class BaseConversionManager:
         Raises:
             ValueError: If input extension is not supported
         """
-        import_class_map = {
-            "csv": CSVInput,
-            "tsv": TsvInput,
-            "txt": TxtInput,
-            "json": JSONInput,
-            "parquet": ParquetInput,
-        }
 
         if self.input_ext == "excel":
             if self.output_ext in (".csv", ".tsv", ".txt"):

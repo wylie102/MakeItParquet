@@ -12,7 +12,7 @@ import uuid
 import tempfile
 import os
 from pathlib import Path
-import logging
+from user_interface import logger
 import argparse
 from typing import List
 
@@ -127,25 +127,25 @@ class ExcelUtils:
                     raise ValueError("Unsupported format in export_with_inferred_types")
                 conn.execute(final_copy_cmd)
             except Exception as e:
-                logging.error(f"Error during Excel export: {e}")
+                logger.error(f"Error during Excel export: {e}")
                 raise
             finally:
                 if table_name is not None:
                     try:
                         conn.execute(f"DROP TABLE IF EXISTS {table_name}")
                     except Exception as drop_error:
-                        logging.warning(
+                        logger.warning(
                             f"Failed to drop temporary table {table_name}: {drop_error}"
                         )
                 try:
                     if os.path.exists(sample_csv):
                         os.remove(sample_csv)
                 except Exception as remove_error:
-                    logging.warning(
+                    logger.warning(
                         f"Failed to remove temporary file {sample_csv}: {remove_error}"
                     )
         except Exception as e:
-            logging.error(f"Error during Excel export: {e}")
+            logger.error(f"Error during Excel export: {e}")
             raise
 
     @staticmethod
@@ -187,7 +187,7 @@ class ExcelUtils:
             return
 
         parts = (row_count + effective_limit - 1) // effective_limit
-        logging.info(
+        logger.info(
             f"Excel export: {row_count} rows exceed the effective limit of {effective_limit}. "
             f"Splitting into {parts} parts labelled as '{out_file.stem}_1' to '{out_file.stem}_{parts}'."
         )
@@ -208,7 +208,7 @@ class ExcelUtils:
             if part_count == 0:
                 break
 
-            logging.info(
+            logger.info(
                 f"Exporting part {part+1} with {part_count} rows (offset {offset})."
             )
             out_file_part = (
@@ -244,7 +244,7 @@ class ExcelUtils:
             conn.load_extension("excel")
             return True
         except Exception as e:
-            logging.error(f"Failed to install/load excel extension: {e}")
+            logger.error(f"Failed to install/load excel extension: {e}")
             return False
 
     @staticmethod
@@ -288,5 +288,5 @@ class ExcelUtils:
             conn.load_extension("excel")
             return True
         except Exception as e:
-            logging.error(f"Failed to install/load excel extension: {e}")
+            logger.error(f"Failed to install/load excel extension: {e}")
             return False

@@ -203,23 +203,23 @@ class ExcelUtils:
             part_count = result[0]
             if part_count > effective_limit:
                 raise ValueError(
-                    f"Part {part+1} exceeds effective limit ({part_count} > {effective_limit})"
+                    f"Part {part + 1} exceeds effective limit ({part_count} > {effective_limit})"
                 )
             if part_count == 0:
                 break
 
             logger.info(
-                f"Exporting part {part+1} with {part_count} rows (offset {offset})."
+                f"Exporting part {part + 1} with {part_count} rows (offset {offset})."
             )
             out_file_part = (
-                out_file.parent / f"{out_file.stem}_{part+1}{out_file.suffix}"
+                out_file.parent / f"{out_file.stem}_{part + 1}{out_file.suffix}"
             )
             unique_out_file = out_file_part
             counter = 1
             while unique_out_file.exists():
                 unique_out_file = (
                     out_file.parent
-                    / f"{out_file.stem}_{part+1}_{counter}{out_file.suffix}"
+                    / f"{out_file.stem}_{part + 1}_{counter}{out_file.suffix}"
                 )
                 counter += 1
             conn.sql(

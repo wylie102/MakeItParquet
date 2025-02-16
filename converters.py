@@ -3,7 +3,6 @@
 Module that defines conversion tasks for Make-it-Parquet! using a direct factory function.
 """
 
-
 from pathlib import Path
 import duckdb
 

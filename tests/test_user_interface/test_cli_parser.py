@@ -220,7 +220,7 @@ def test_input_output_extensions_same(input_ext: str, output_ext: str, expected:
     ],
 )
 def test_get_input_output_extensions(
-    input_format, output_format, expected, input_output_flags
+    input_format, output_format, expected, input_output_flags, args
 ):
     """
     Test get_input_output_extensions for a representative set of scenarios:
@@ -229,8 +229,9 @@ def test_get_input_output_extensions(
       - One valid and one invalid format.
       - Missing format(s).
     """
-    # Create a dummy argparse.Namespace with the given format values.
-    args = argparse.Namespace(input_format=input_format, output_format=output_format)
+    # Update the args fixture with the given format values.
+    args.input_format = input_format
+    args.output_format = output_format
 
     # Call the function under test.
     result = get_input_output_extensions(args, input_output_flags)

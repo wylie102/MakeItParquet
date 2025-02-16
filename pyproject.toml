@@ -11,13 +11,13 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
   "pytest",
-  "black",
+  "pytest-xdist",
+  "pytest-cov",
+  "pytest-mock",
   "isort",
   "mypy",
   "ruff",
   "coverage",
-  "pytest-cov",
-  "pytest-mock",
-  "pytest-asyncio",
-  "pytest-asyncio",
+  "debugpy",
+  "bandit",
 ]

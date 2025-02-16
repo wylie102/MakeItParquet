@@ -21,12 +21,14 @@ class Settings:
         # Input/output flags.
         self.input_output_flags = InputOutputFlags()
         # Validate input and output format arguments.
-        self.input_ext, self.output_ext = get_input_output_extensions(self.args, self.input_output_flags)
+        self.input_ext, self.output_ext = get_input_output_extensions(
+            self.args, self.input_output_flags
+        )
         # File information.
         self.path = resolve_path(self.args.input_path)
         self.stat = generate_file_stat(self.path)
         self.file_or_dir = file_or_dir(self.stat)
-        
+
         # Initialise attributes for additional settings.
         self.excel_settings = None
         self.txt_settings = None
@@ -48,7 +50,9 @@ class InputOutputFlags:
         self.output_ext_supplied_from_prompt: bool = False
         self.input_ext_supplied_from_prompt: bool = False
 
-    def set_flags(self, environment: str, input_ext: Optional[str], output_ext: Optional[str]):
+    def set_flags(
+        self, environment: str, input_ext: Optional[str], output_ext: Optional[str]
+    ):
         """
         Set the flags based on the environment.
         """
@@ -62,13 +66,12 @@ class InputOutputFlags:
         else:
             raise ValueError(f"Invalid environment: {environment}")
 
-    def set_cli_flags(self, input_ext: Optional[str], output_ext: Optional[str]): 
+    def set_cli_flags(self, input_ext: Optional[str], output_ext: Optional[str]):
         """
         Set the CLI flags.
         """
         self.input_ext_supplied_from_cli = input_ext is not None
         self.output_ext_supplied_from_cli = output_ext is not None
-        
 
 
 def determine_excel_options(self):

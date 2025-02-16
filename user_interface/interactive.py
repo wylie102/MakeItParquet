@@ -6,6 +6,7 @@ from pathlib import Path
 if TYPE_CHECKING:
     from user_interface.settings import Settings  # Import only for MyPy
 
+
 def get_delimiter(
     existing: Optional[str] = None,
     prompt_text: str = "Enter delimiter (t for tab, c for comma): ",
@@ -63,7 +64,8 @@ def prompt_excel_options(file: Path):
     )
     return sheet, range_
 
-def prompt_for_output_format(settings: 'Settings', ALIAS_TO_EXTENSION_MAP: dict):
+
+def prompt_for_output_format(settings: "Settings", ALIAS_TO_EXTENSION_MAP: dict):
     """
     Prompt user for output format, ensuring it differs from input.
 
@@ -77,11 +79,11 @@ def prompt_for_output_format(settings: 'Settings', ALIAS_TO_EXTENSION_MAP: dict)
         # Prompt for output format.
         output_format = (
             input(
-                    "Enter desired output format (csv, tsv, txt, parquet(pq), json(js), excel(ex)): "
-                )
-                .strip()
-                .lower()
+                "Enter desired output format (csv, tsv, txt, parquet(pq), json(js), excel(ex)): "
             )
+            .strip()
+            .lower()
+        )
         # Validate user input.
         ## Output extension is valid and different from input extension.
         if (
@@ -132,28 +134,29 @@ def prompt_for_output_format(settings: 'Settings', ALIAS_TO_EXTENSION_MAP: dict)
                     continue
         else:
             logging.error(
-            "Invalid output format. Please enter a valid output format (note: formats do not include the '.' ."
-        )
+                "Invalid output format. Please enter a valid output format (note: formats do not include the '.' ."
+            )
         continue
+
 
 def prompt_for_input_format(ALIAS_TO_EXTENSION_MAP: dict):
     """
     Prompt user for input format.
     """
     while True:
-            input_format = (
-                input(
-                    "Enter desired input format (csv, tsv, txt, parquet(pq), json(js), excel(ex)): "
-                )
-                .strip()
-                .lower()
+        input_format = (
+            input(
+                "Enter desired input format (csv, tsv, txt, parquet(pq), json(js), excel(ex)): "
             )
-            if input_format in ALIAS_TO_EXTENSION_MAP:
-                input_ext = ALIAS_TO_EXTENSION_MAP[input_format]
-                logging.info(f"Input extension set to: {input_ext}")
-                break
-            else:
-                logging.error(
-                    "Invalid input format. Please enter a valid input format (note: formats do not include the '.' ."
-                )
-                continue
+            .strip()
+            .lower()
+        )
+        if input_format in ALIAS_TO_EXTENSION_MAP:
+            input_ext = ALIAS_TO_EXTENSION_MAP[input_format]
+            logging.info(f"Input extension set to: {input_ext}")
+            break
+        else:
+            logging.error(
+                "Invalid input format. Please enter a valid input format (note: formats do not include the '.' ."
+            )
+            continue

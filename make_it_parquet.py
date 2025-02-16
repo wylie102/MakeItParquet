@@ -14,6 +14,7 @@ from user_interface.settings import Settings
 from conversion_manager import FileConversionManager, DirectoryConversionManager
 from user_interface.cli_parser import parse_cli_arguments
 
+
 class MakeItParquet:
     """
     Main class for the Make-it-Parquet! conversion tool.
@@ -28,7 +29,9 @@ class MakeItParquet:
         self.logger = Logger(self.settings.args.log_level)
         self.conversion_manager = self._create_conversion_manager(self.settings)
 
-    def _create_conversion_manager(self, settings: Settings) -> FileConversionManager | DirectoryConversionManager:
+    def _create_conversion_manager(
+        self, settings: Settings
+    ) -> FileConversionManager | DirectoryConversionManager:
         """
         Factory function to create a conversion manager based on the input path.
 

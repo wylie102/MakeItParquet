@@ -4,7 +4,7 @@ Module for managing file and directory conversions.
 
 This module provides classes to manage the conversion of files and directories:
 - BaseConversionManager: Base class with common functionality
-- FileConversionManager: Handles single file conversions 
+- FileConversionManager: Handles single file conversions
 - DirectoryConversionManager: Handles directory conversions
 
 The managers handle:
@@ -131,7 +131,7 @@ class BaseConversionManager:
             return conv.import_class_map[self.input_ext]()
 
         raise ValueError(f"Unsupported input extension: {self.input_ext}")
-    
+
     def _start_conversion_process(self):
         """
         Controller that runs through three phases:
@@ -309,6 +309,7 @@ class FileConversionManager(BaseConversionManager):
             self.settings._exit_program(
                 f"Invalid file extension: {self.input_ext}. Allowed: {self.ALLOWED_FILE_EXTENSIONS}"
             )
+
 
 class DirectoryConversionManager(BaseConversionManager):
     """

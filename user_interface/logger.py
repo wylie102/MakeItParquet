@@ -2,6 +2,7 @@ import logging
 from logging.handlers import QueueHandler, QueueListener
 import queue
 
+
 class Logger:
     def __init__(self, log_level: str):
         self.log_queue = queue.Queue()
@@ -37,7 +38,6 @@ class Logger:
         # Queue listener processes logs in a background thread.
         self.listener = QueueListener(self.log_queue, console_handler)
         self.listener.start()
-
 
     def _stop_logging(self):
         """

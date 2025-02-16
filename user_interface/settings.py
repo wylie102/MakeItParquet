@@ -18,12 +18,15 @@ class Settings:
         """
         # CLI arguments.
         self.args = args
+        
         # Input/output flags.
         self.input_output_flags = InputOutputFlags()
-        # Validate input and output format arguments.
+        
+        # get input and output extensions from CLI arguments (if provided).
         self.input_ext, self.output_ext = get_input_output_extensions(
             self.args, self.input_output_flags
         )
+        
         # File information.
         self.path = resolve_path(self.args.input_path)
         self.stat = generate_file_stat(self.path)

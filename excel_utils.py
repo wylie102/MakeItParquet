@@ -21,6 +21,13 @@ from user_interface.settings import Settings
 
 class ExcelUtils:
     @staticmethod
+    def escape_literal(value: str) -> str:
+        """
+        Escape single quotes in a string to safely use it as an SQL literal.
+        """
+        return value.replace("'", "''")
+
+    @staticmethod
     def build_excel_options(sheet, range_):
         """
         Build an Excel options clause for the read query.
@@ -37,10 +44,14 @@ class ExcelUtils:
         """
         parts = []
         if sheet is not None:
-            sheet_val = f"Sheet{sheet}" if isinstance(sheet, int) else sheet
+            sheet_val = (
+                f"Sheet{sheet}"
+                if isinstance(sheet, int)
+                else ExcelUtils.escape_literal(sheet)
+            )
             parts.append(f"sheet = '{sheet_val}'")
         if range_ is not None:
-            parts.append(f"range = '{range_}'")
+            parts.append(f"range = '{ExcelUtils.escape_literal(range_)}'")
         return f", {', '.join(parts)}" if parts else ""
 
     @staticmethod
@@ -59,7 +70,7 @@ class ExcelUtils:
         Returns:
             str: SQL query for reading the Excel file.
         """
-        file_path = str(file.resolve())
+        file_path = ExcelUtils.escape_literal(str(file.resolve()))
         options = ExcelUtils.build_excel_options(sheet, range_)
         return f"SELECT * FROM read_xlsx('{file_path}', all_varchar = 'true'{options})"
 
@@ -93,8 +104,8 @@ class ExcelUtils:
             Exception: Propagates any exceptions encountered during export.
         """
         excel_options = ExcelUtils.build_excel_options(sheet, range_)
-        file_path = str(file.resolve())
-        out_file_path = str(out_file.resolve())
+        file_path = ExcelUtils.escape_literal(str(file.resolve()))
+        out_file_path = ExcelUtils.escape_literal(str(out_file.resolve()))
 
         with tempfile.NamedTemporaryFile(delete=False, suffix=".csv") as tmp:
             sample_csv = tmp.name
@@ -172,7 +183,7 @@ class ExcelUtils:
         Raises:
             ValueError: If no result is returned from the count query or if any part exceeds the effective limit.
         """
-        out_file_path = str(out_file.resolve())
+        out_file_path = ExcelUtils.escape_literal(str(out_file.resolve()))
         count_query = f"SELECT COUNT(*) FROM ({base_query}) AS t"
         result = conn.execute(count_query).fetchone()
         if result is None:

@@ -16,7 +16,7 @@ from user_interface import logger
 import argparse
 from typing import List
 
-from cli_interface import Settings
+from user_interface.settings import Settings
 
 
 class ExcelUtils:

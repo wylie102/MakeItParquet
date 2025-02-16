@@ -9,6 +9,7 @@ from typing import Optional
 from extension_mapping import ALIAS_TO_EXTENSION_MAP
 from user_interface.settings import Settings
 
+
 def parse_cli_arguments() -> argparse.Namespace:
     """
     Parse command line arguments.
@@ -49,6 +50,7 @@ def parse_cli_arguments() -> argparse.Namespace:
     args = parser.parse_args()
     return args
 
+
 def validate_format_inputs(settings: Settings) -> Tuple[Optional[str], Optional[str]]:
     """
     Validate input and output format arguments that were passed in directly from the command line.
@@ -58,21 +60,37 @@ def validate_format_inputs(settings: Settings) -> Tuple[Optional[str], Optional[
     Returns:
         Tuple[Optional[str], Optional[str]]: Validated input and output extensions
     """
-    # Validate input format.
+    input_ext = validate_input_format(settings)
+    output_ext = validate_output_format(settings)
+    input_ext, output_ext = reset_extensions_if_same(
+        input_ext, output_ext
+    )
+    settings.input_output_flags.set_cli_flags(input_ext, output_ext)
+    # Return input and output extensions.
+    return input_ext, output_ext    
+
+
+def validate_input_format(settings: Settings) -> Optional[str]:
+    """
+    Validate input format.
+    """
     if settings.args.input_format:
         if settings.args.input_format in ALIAS_TO_EXTENSION_MAP:
             input_ext = ALIAS_TO_EXTENSION_MAP[settings.args.input_format]
-        
         else:
             logging.error(
                 f"Received invalid input format: {settings.args.input_format}\n Input format will be automatically detected."
             )
             input_ext = None
-            settings.input_output_flags.input_ext_cli_flag = 0
     else:
         input_ext = None
-        settings.input_output_flags.input_ext_cli_flag = 0
-    # Validate output format.
+    return input_ext
+
+
+def validate_output_format(settings: Settings) -> Optional[str]:
+    """
+    Validate output format.
+    """
     if settings.args.output_format:
         if settings.args.output_format in ALIAS_TO_EXTENSION_MAP:
             output_ext = ALIAS_TO_EXTENSION_MAP[settings.args.output_format]
@@ -83,17 +101,21 @@ def validate_format_inputs(settings: Settings) -> Tuple[Optional[str], Optional[
             output_ext = None
     else:
         output_ext = None
+    return output_ext
 
+
+def reset_extensions_if_same(
+    input_ext: Optional[str], output_ext: Optional[str]
+) -> Tuple[Optional[str], Optional[str]]:
+    """
+    Reset input and output extensions if they are the same.
+    """
     # Raise error if input and output formats are the same.
     if input_ext and output_ext:
         if input_ext == output_ext:
             logging.error(
-                "Input and output formats cannot be the same. Input format will be automatically detected."
+                "Input and output extensions cannot be the same. Input extension will be automatically detected, please specify output extension."
             )
-            input_ext = None
+            input_ext = None #TODO: 16-Feb-2025: Review whether this is the best choice here. 
             output_ext = None
-            settings.input_output_flags.input_ext_cli_flag = 0
-            settings.input_output_flags.output_ext_cli_flag = 0
-
-    # Return input and output extensions.
     return input_ext, output_ext

@@ -119,16 +119,16 @@ class BaseConversionManager:
 
         if self.input_ext == "excel":
             if self.output_ext in (".csv", ".tsv", ".txt"):
-                return ExcelInputUntyped()
+                return conv.ExcelInputUntyped()
             elif self.output_ext in (".parquet", ".json", None):
-                return ExcelInputTyped()
+                return conv.ExcelInputTyped()
             else:
                 raise ValueError(
                     f"Unsupported output extension for Excel: {self.output_ext}"
                 )
 
-        if self.input_ext in import_class_map:
-            return import_class_map[self.input_ext]()
+        if self.input_ext in conv.import_class_map:
+            return conv.import_class_map[self.input_ext]()
 
         raise ValueError(f"Unsupported input extension: {self.input_ext}")
     
@@ -250,12 +250,12 @@ class BaseConversionManager:
             ValueError: If output format is not supported
         """
         export_class_map = {
-            "csv": CSVOutput,
-            "tsv": TsvOutput,
-            "txt": TxtOutput,
-            "json": JSONOutput,
-            "parquet": ParquetOutput,
-            "excel": ExcelOutput,
+            "csv": conv.CSVOutput,
+            "tsv": conv.TsvOutput,
+            "txt": conv.TxtOutput,
+            "json": conv.JSONOutput,
+            "parquet": conv.ParquetOutput,
+            "excel": conv.ExcelOutput,
         }
 
         if self.output_ext in export_class_map:

@@ -1,10 +1,11 @@
 #! /usr/bin/env python3
 
 from typing import Optional
-from user_interface.cli_parser import validate_format_inputs
 from file_information import resolve_path, file_or_dir, generate_file_stat
 from user_interface.interactive import prompt_excel_options, prompt_for_txt_delimiter
 import argparse
+from user_interface.cli_parser import get_input_output_extensions
+
 
 class Settings:
     """
@@ -20,7 +21,7 @@ class Settings:
         # Input/output flags.
         self.input_output_flags = InputOutputFlags()
         # Validate input and output format arguments.
-        self.input_ext, self.output_ext = validate_format_inputs(self.args, self.input_output_flags)
+        self.input_ext, self.output_ext = get_input_output_extensions(self.args, self.input_output_flags)
         # File information.
         self.path = resolve_path(self.args.input_path)
         self.stat = generate_file_stat(self.path)

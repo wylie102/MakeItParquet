@@ -9,6 +9,6 @@ wheels/
 # Virtual environments
 .venv
 
-
+# IDE files
 .idea/
 settings.json

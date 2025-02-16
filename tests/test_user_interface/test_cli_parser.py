@@ -6,11 +6,12 @@ import sys
 from pathlib import Path
 from user_interface.settings import InputOutputFlags
 from user_interface.cli_parser import (
-    validate_input_format,
-    validate_output_format,
-    reset_extensions_if_same,
-    validate_format_inputs,
     parse_cli_arguments,
+    _check_format_supported,
+    _map_format_to_extension,
+    _validate_format,
+    _input_output_extensions_same,
+    get_input_output_extensions,
 )
 
 
@@ -24,6 +25,7 @@ def input_output_flags():
     return InputOutputFlags()
 
 
+# Test minimal arguments
 def test_parse_cli_arguments_minimal(monkeypatch):
     """Test with only the required argument (input_path)."""
     monkeypatch.setattr(sys, "argv", ["script_name", "data/input.csv"])
@@ -39,6 +41,10 @@ def test_parse_cli_arguments_minimal(monkeypatch):
     assert args.log_level == "INFO"  # Default value
 
 
+###--- test parse_cli_arguments ---###
+
+
+# Test all possible arguments
 def test_parse_cli_arguments_all_options(monkeypatch):
     """Test with all possible arguments."""
     monkeypatch.setattr(
@@ -73,6 +79,7 @@ def test_parse_cli_arguments_all_options(monkeypatch):
     assert args.log_level == "DEBUG"
 
 
+# Test missing input path
 def test_parse_cli_arguments_missing_input(monkeypatch):
     """Test when no input path is provided (should raise an error)."""
     monkeypatch.setattr(sys, "argv", ["script_name"])
@@ -81,6 +88,7 @@ def test_parse_cli_arguments_missing_input(monkeypatch):
         parse_cli_arguments()
 
 
+# Test invalid log level
 def test_parse_cli_arguments_invalid_log_level(monkeypatch):
     """Test invalid log level (should still parse but with default)."""
     monkeypatch.setattr(
@@ -91,46 +99,44 @@ def test_parse_cli_arguments_invalid_log_level(monkeypatch):
     assert args.log_level == "INVALID"  # argparse does not validate log levels
 
 
+###--- test _check_format_supported ---###
+
+
+# Test valid input formats
 @pytest.mark.parametrize(
-    "input_format, expected",
+    "format, expected",
     [
-        ("csv", ".csv"),
-        ("tsv", ".tsv"),
-        ("txt", ".txt"),
-        ("parquet", ".parquet"),
-        ("pq", ".parquet"),
-        ("json", ".json"),
-        ("js", ".json"),
-        ("excel", ".xlsx"),
-        ("ex", ".xlsx"),
-        ("xlsx", ".xlsx"),
+        ("csv", True),
+        ("tsv", True),
+        ("txt", True),
+        ("parquet", True),
+        ("pq", True),
+        ("json", True),
+        ("js", True),
+        ("excel", True),
+        ("ex", True),
+        ("xlsx", True),
     ],
 )
-def test_validate_input_format(args: argparse.Namespace, input_format, expected):
-    args.input_format = input_format
-    assert validate_input_format(args) == expected
-
-
-def test_validate_input_format_none(args: argparse.Namespace):
-    args.input_format = None
-    assert validate_input_format(args) is None
+def test_check_format_supported(format, expected):
+    assert _check_format_supported(format) == expected
 
 
 # Test invalid input formats
 @pytest.mark.parametrize("invalid_format", ["invalid", "unsupported", "bad"])
-def test_validate_input_format_invalid(
-    args: argparse.Namespace, invalid_format, caplog
-):
-    args.input_format = invalid_format
+def test_check_format_supported_invalid(invalid_format, caplog):
     with caplog.at_level("ERROR"):
-        result = validate_input_format(args)
-    assert result is None
+        result = _check_format_supported(invalid_format)
+    assert result is False
     # Check that the error message was logged correctly.
-    assert f"Received invalid input format: {invalid_format}" in caplog.text
+    assert f"Received invalid format: {invalid_format}" in caplog.text
+
+
+###--- test _map_format_to_extension ---###
 
 
 @pytest.mark.parametrize(
-    "output_format, expected",
+    "format, expected",
     [
         ("csv", ".csv"),
         ("tsv", ".tsv"),
@@ -143,62 +149,91 @@ def test_validate_input_format_invalid(
         ("xlsx", ".xlsx"),
     ],
 )
-def test_validate_output_format(args: argparse.Namespace, output_format, expected):
-    args.output_format = output_format
-    assert validate_output_format(args) == expected
+def test_map_format_to_extension(format, expected):
+    assert _map_format_to_extension(format) == expected
 
 
-def test_validate_output_format_none(args: argparse.Namespace):
-    args.output_format = None
-    assert validate_output_format(args) is None
+###--- test _validate_format ---###
 
 
-# Test invalid output formats
-@pytest.mark.parametrize("invalid_format", ["invalid", "unsupported", "bad"])
-def test_validate_output_format_invalid(
-    args: argparse.Namespace, invalid_format, caplog
+# Test valid input formats
+@pytest.mark.parametrize(
+    "format, expected",
+    [
+        ("csv", ".csv"),
+        ("tsv", ".tsv"),
+        ("txt", ".txt"),
+        ("parquet", ".parquet"),
+        ("pq", ".parquet"),
+        ("json", ".json"),
+        ("js", ".json"),
+        ("excel", ".xlsx"),
+        ("xlsx", ".xlsx"),
+        ("invalid", None),
+        ("unsupported", None),
+        ("bad", None),
+    ],
+)
+def test_validate_format(format, expected):
+    result = _validate_format(format)
+    assert result == expected
+
+
+###--- test _input_output_extensions_same ---###
+
+
+@pytest.mark.parametrize(
+    "input_ext, output_ext, expected",
+    [
+        ("csv", "csv", True),
+        ("csv", "parquet", False),
+        (None, None, False),
+        ("csv", None, False),
+        (None, "csv", False),
+    ],
+)
+def test_input_output_extensions_same(input_ext: str, output_ext: str, expected: bool):
+    result = _input_output_extensions_same(input_ext, output_ext)
+    assert result == expected
+
+
+###--- test get_input_output_extensions ---###
+
+
+@pytest.mark.parametrize(
+    "input_format, output_format, expected",
+    [
+        # Both valid and different formats
+        ("csv", "parquet", (".csv", ".parquet")),
+        # Both valid but the same (should be reset to None)
+        ("csv", "csv", (None, None)),
+        # Valid input, invalid output (invalid output should yield None)
+        ("csv", "invalid", (".csv", None)),
+        # Invalid input, valid output (invalid input should yield None)
+        ("invalid", "parquet", (None, ".parquet")),
+        # Both formats missing
+        (None, None, (None, None)),
+        # Input missing, valid output provided
+        (None, "csv", (None, ".csv")),
+        # Valid input provided, output missing
+        ("json", None, (".json", None)),
+    ],
+)
+def test_get_input_output_extensions(
+    input_format, output_format, expected, input_output_flags
 ):
-    args.output_format = invalid_format
-    with caplog.at_level("ERROR"):
-        result = validate_output_format(args)
-    assert result is None
-    # Check that the error message was logged correctly.
-    assert f"Received invalid output format: {invalid_format}" in caplog.text
+    """
+    Test get_input_output_extensions for a representative set of scenarios:
+      - Valid and differing formats.
+      - Same valid formats (which should reset both to None).
+      - One valid and one invalid format.
+      - Missing format(s).
+    """
+    # Create a dummy argparse.Namespace with the given format values.
+    args = argparse.Namespace(input_format=input_format, output_format=output_format)
 
+    # Call the function under test.
+    result = get_input_output_extensions(args, input_output_flags)
 
-def test_reset_extensions_if_same():
-    input_ext, output_ext = reset_extensions_if_same(".csv", ".csv")
-    assert input_ext is None
-    assert output_ext is None
-    input_ext, output_ext = reset_extensions_if_same(".csv", ".parquet")
-    assert input_ext == ".csv"
-    assert output_ext == ".parquet"
-
-
-def test_reset_extensions_if_same_logging(caplog):
-    """Test that providing the same input and output extensions logs an error message."""
-    with caplog.at_level("ERROR"):
-        input_ext, output_ext = reset_extensions_if_same(".csv", ".csv")
-    assert input_ext is None
-    assert output_ext is None
-    assert "Input and output extensions cannot be the same" in caplog.text
-
-
-def test_validate_format_inputs(
-    args: argparse.Namespace, input_output_flags: InputOutputFlags
-):
-    args.input_format = "csv"
-    args.output_format = "parquet"
-    input_ext, output_ext = validate_format_inputs(args, input_output_flags)
-    assert input_ext == ".csv"
-    assert output_ext == ".parquet"
-    args.input_format = None
-    args.output_format = None
-    input_ext, output_ext = validate_format_inputs(args, input_output_flags)
-    assert input_ext is None
-    assert output_ext is None
-    args.input_format = "csv"
-    args.output_format = "csv"
-    input_ext, output_ext = validate_format_inputs(args, input_output_flags)
-    assert input_ext is None
-    assert output_ext is None
+    # Assert that the result matches the expected tuple.
+    assert result == expected

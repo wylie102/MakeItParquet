@@ -28,7 +28,7 @@ class MakeItParquet:
         self.logger = Logger(self.settings.args.log_level)
         self.conversion_manager = self._create_conversion_manager(self.settings)
 
-    def _create_conversion_manager(self, settings: Settings):
+    def _create_conversion_manager(self, settings: Settings) -> FileConversionManager | DirectoryConversionManager:
         """
         Factory function to create a conversion manager based on the input path.
 
@@ -46,7 +46,7 @@ class MakeItParquet:
         else:
             return DirectoryConversionManager(settings)
 
-    def exit_program(self, message: str, error_type: Optional[str] = "error"):
+    def exit_program(self, message: str, error_type: Optional[str] = "error") -> None:
         """
         Exit program with logging and cleanup.
 
@@ -63,7 +63,7 @@ class MakeItParquet:
         exit(1)
 
 
-def main():
+def main() -> None:
     """
     Main entry point for the Make-it-Parquet! conversion tool.
 

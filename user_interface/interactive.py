@@ -1,8 +1,10 @@
 #! /usr/bin/env python3
 import logging
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 from pathlib import Path
-from user_interface.settings import Settings
+
+if TYPE_CHECKING:
+    from user_interface.settings import Settings  # Import only for MyPy
 
 def get_delimiter(
     existing: Optional[str] = None,
@@ -61,7 +63,7 @@ def prompt_excel_options(file: Path):
     )
     return sheet, range_
 
-def prompt_for_output_format(settings: Settings, ALIAS_TO_EXTENSION_MAP: dict):
+def prompt_for_output_format(settings: 'Settings', ALIAS_TO_EXTENSION_MAP: dict):
     """
     Prompt user for output format, ensuring it differs from input.
 

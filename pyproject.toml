@@ -1,5 +1,5 @@
 [project]
-name = "Make-it-Parquet!"
+name = "Make-it-Parquet"
 version = "0.1.0"
 description = "A file conversion tool powered by DuckDB."
 readme = "README.md"
@@ -8,5 +8,16 @@ dependencies = [
     "duckdb>=1.2.0",
 ]
 
-[tool.hatch]
-option = "..."
+[project.optional-dependencies]
+dev = [
+  "pytest",
+  "black",
+  "isort",
+  "mypy",
+  "ruff",
+  "coverage",
+  "pytest-cov",
+  "pytest-mock",
+  "pytest-asyncio",
+  "pytest-asyncio",
+]

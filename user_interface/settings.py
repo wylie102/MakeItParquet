@@ -1,26 +1,26 @@
 #! /usr/bin/env python3
 
 from typing import Optional
-from user_interface.cli_parser import parse_cli_arguments, validate_format_inputs
+from user_interface.cli_parser import validate_format_inputs
 from file_information import resolve_path, file_or_dir, generate_file_stat
 from user_interface.interactive import prompt_excel_options, prompt_for_txt_delimiter
-
+import argparse
 
 class Settings:
     """
     Settings class for managing application configuration.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, args: argparse.Namespace) -> None:
         """
         Initialize the Settings object.
         """
+        # CLI arguments.
+        self.args = args
         # Input/output flags.
         self.input_output_flags = InputOutputFlags()
-        # CLI arguments.
-        self.args = parse_cli_arguments(self.input_output_flags)
         # Validate input and output format arguments.
-        self.input_ext, self.output_ext = validate_format_inputs(self)
+        self.input_ext, self.output_ext = validate_format_inputs(self.args, self.input_output_flags)
         # File information.
         self.path = resolve_path(self.args.input_path)
         self.stat = generate_file_stat(self.path)
@@ -65,8 +65,8 @@ class InputOutputFlags:
         """
         Set the CLI flags.
         """
-        self.input_output_flags.input_ext_supplied_from_cli = input_ext is not None
-        self.input_output_flags.output_ext_supplied_from_cli = output_ext is not None
+        self.input_ext_supplied_from_cli = input_ext is not None
+        self.output_ext_supplied_from_cli = output_ext is not None
         
 
 

@@ -17,7 +17,7 @@ ALIAS_TO_EXTENSION_MAP: Dict[str, str] = {
     "pq": ".parquet",
     "excel": ".xlsx",
     "ex": ".xlsx",
-    "xls": ".xlsx",
+    "xlsx": ".xlsx",
 }
 
 # Reverse the alias to extension map.

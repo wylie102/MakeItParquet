@@ -12,7 +12,7 @@ from user_interface.logger import Logger
 from typing import Optional
 from user_interface.settings import Settings
 from conversion_manager import FileConversionManager, DirectoryConversionManager
-
+from user_interface.cli_parser import parse_cli_arguments
 
 class MakeItParquet:
     """
@@ -20,7 +20,11 @@ class MakeItParquet:
     """
 
     def __init__(self):
-        self.settings = Settings()
+        """
+        Initialise the MakeItParquet class.
+        """
+        self.args = parse_cli_arguments()
+        self.settings = Settings(self.args)
         self.logger = Logger(self.settings.args.log_level)
         self.conversion_manager = self._create_conversion_manager(self.settings)
 

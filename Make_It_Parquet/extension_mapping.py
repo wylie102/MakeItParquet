@@ -1,6 +1,6 @@
 #! /usr/bin/env python3
 
-import converters as conv
+import Make_It_Parquet.converters as conv
 from typing import Dict
 
 # Allowed file extensions.

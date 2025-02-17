@@ -20,4 +20,5 @@ dev = [
   "coverage",
   "debugpy",
   "bandit",
+  "pytest-html",
 ]

@@ -4,7 +4,7 @@ import argparse
 from typing import Tuple, Optional, TYPE_CHECKING
 import logging
 from pathlib import Path
-from extension_mapping import ALIAS_TO_EXTENSION_MAP
+from Make_It_Parquet.extension_mapping import ALIAS_TO_EXTENSION_MAP
 
 if TYPE_CHECKING:
     from user_interface.settings import InputOutputFlags

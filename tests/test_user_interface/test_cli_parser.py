@@ -4,8 +4,8 @@ import pytest
 import argparse
 import sys
 from pathlib import Path
-from user_interface.settings import InputOutputFlags
-from user_interface.cli_parser import (
+from Make_It_Parquet.user_interface.settings import InputOutputFlags
+from Make_It_Parquet.user_interface.cli_parser import (
     parse_cli_arguments,
     _check_format_supported,
     _map_format_to_extension,

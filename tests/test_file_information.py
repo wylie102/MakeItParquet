@@ -2,7 +2,7 @@
 
 import pytest
 from pathlib import Path
-from file_information import (
+from Make_It_Parquet.file_information import (
     resolve_path,
     file_or_dir,
     generate_file_stat,

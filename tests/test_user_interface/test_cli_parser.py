@@ -125,7 +125,7 @@ def test_check_format_supported(format, expected):
 # Test invalid input formats
 @pytest.mark.parametrize("invalid_format", ["invalid", "unsupported", "bad"])
 def test_check_format_supported_invalid(invalid_format, caplog):
-    with caplog.at_level("ERROR"):
+    with caplog.at_level("WARNING"):
         result = _check_format_supported(invalid_format)
     assert result is False
     # Check that the error message was logged correctly.

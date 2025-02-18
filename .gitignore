@@ -15,3 +15,6 @@ settings.json
 
 # Golden Files
 /tests/files_for_testing_with/sample_files/
+
+# Scratch files
+scratch.*

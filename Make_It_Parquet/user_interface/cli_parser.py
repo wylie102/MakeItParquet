@@ -58,7 +58,7 @@ def _check_format_supported(format: str) -> bool:
     if format in ALIAS_TO_EXTENSION_MAP:
         return True
     else:
-        logging.error(f"Received invalid format: {format}")
+        logging.warning(f"Received invalid format: {format}")
         return False
 
 
@@ -94,8 +94,8 @@ def _input_output_extensions_same(
     # Raise error if input and output formats are the same.
     if input_ext and output_ext:
         if input_ext == output_ext:
-            # log error
-            logging.error(
+            # log warning
+            logging.warning(
                 "Input and output extensions cannot be the same. Input extension will be automatically detected, please specify output extension."
             )
             return True

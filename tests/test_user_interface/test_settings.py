@@ -108,3 +108,6 @@ def test_set_cli_flags_with_no_input_or_output_ext(
     assert mock_input_output_flags.input_ext_auto_detected is False
     assert mock_input_output_flags.output_ext_supplied_from_prompt is False
     assert mock_input_output_flags.input_ext_supplied_from_prompt is False
+
+
+# TODO: Add tests for cli flag updates from other environments once written.

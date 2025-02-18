@@ -4,7 +4,7 @@ import pytest
 from pathlib import Path
 from Make_It_Parquet.file_information import (
     resolve_path,
-    file_or_dir,
+    determine_file_or_dir,
     generate_file_stat,
     file_size,
     file_name,
@@ -57,7 +57,7 @@ GOLDEN_INFO = {
 @pytest.fixture(scope="session")
 def sample_files():
     base_dir = Path(
-        "/Users/wylie/Desktop/Projects/DuckConvert/tests/files_for_testing_with/sample_files"
+        "/Users/wylie/Desktop/Projects/MakeItParquet/tests/files_for_testing_with/sample_files"
     )
     file_paths = {
         "txt": base_dir / "sample.txt",
@@ -88,15 +88,15 @@ def test_generate_file_stat(sample_files, file_type):
 @pytest.mark.parametrize("file_type", list(GOLDEN_INFO.keys()))
 def test_file_or_dir(sample_files, file_type):
     file_path = sample_files[file_type]
-    assert file_or_dir(file_path) == "file"
+    assert determine_file_or_dir(file_path) == "file"
 
 
 @pytest.mark.parametrize("file_type", list(GOLDEN_INFO.keys()))
 def test_file_size(sample_files, file_type):
     file_path = sample_files[file_type]
     expected = GOLDEN_INFO[file_type]
-    stat = generate_file_stat(file_path)
-    assert file_size(stat) == expected["file_size"]
+    stat_obj = generate_file_stat(file_path)
+    assert file_size(stat_obj) == expected["file_size"]
 
 
 @pytest.mark.parametrize("file_type", list(GOLDEN_INFO.keys()))

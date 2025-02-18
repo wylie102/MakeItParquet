@@ -8,7 +8,6 @@
 Make-it-Parquet!: A data file conversion tool powered by DuckDB.
 """
 
-from user_interface.logger import Logger
 from typing import Optional
 from user_interface.settings import Settings
 from conversion_manager import FileConversionManager, DirectoryConversionManager
@@ -26,7 +25,6 @@ class MakeItParquet:
         """
         self.args = parse_cli_arguments()
         self.settings = Settings(self.args)
-        self.logger = Logger(self.settings.args.log_level)
         self.conversion_manager = self._create_conversion_manager(self.settings)
 
     def _create_conversion_manager(

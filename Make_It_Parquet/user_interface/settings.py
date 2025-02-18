@@ -1,17 +1,14 @@
 #! /usr/bin/env python3
 
 from typing import Optional
-from Make_It_Parquet.file_information import (
+from ..file_information import (
     resolve_path,
-    file_or_dir,
+    determine_file_or_dir,
     generate_file_stat,
 )
-from Make_It_Parquet.user_interface.interactive import (
-    prompt_excel_options,
-    prompt_for_txt_delimiter,
-)
 import argparse
-from Make_It_Parquet.user_interface.cli_parser import get_input_output_extensions
+from .cli_parser import get_input_output_extensions
+from .logger import Logger
 
 
 class Settings:
@@ -25,7 +22,8 @@ class Settings:
         """
         # CLI arguments.
         self.args = args
-
+        # Logger.
+        self.logger = Logger(self.args.log_level)
         # Input/output flags.
         self.input_output_flags = InputOutputFlags()
 
@@ -37,7 +35,7 @@ class Settings:
         # File information.
         self.path = resolve_path(self.args.input_path)
         self.stat = generate_file_stat(self.path)
-        self.file_or_dir = file_or_dir(self.stat)
+        self.file_or_dir = determine_file_or_dir(self.stat)
 
         # Initialise attributes for additional settings.
         self.excel_settings = None
@@ -82,28 +80,3 @@ class InputOutputFlags:
         """
         self.input_ext_supplied_from_cli = input_ext is not None
         self.output_ext_supplied_from_cli = output_ext is not None
-
-
-def determine_excel_options(self):
-    """
-    Set Excel-specific options from args or user prompts.
-    Sets self.sheet and self.range based on args or user input.
-    """
-    # If Excel options are not provided, prompt for them.
-    self.sheet = self.args.sheet
-    self.range = self.args.range
-    if self.sheet is None and self.range is None:
-        self.sheet, self.range = prompt_excel_options(self.input_path)
-
-
-def determine_txt_options(self):
-    """
-    Set TXT-specific options from args or user prompts.
-    """
-    # For TXT output, if no delimiter provided, prompt for it.
-    self.delimiter = self.args.delimiter
-    if self.delimiter is None:
-        self.delimiter = prompt_for_txt_delimiter()
-
-    txt_kwargs = prompt_for_txt_delimiter()
-    self.args.delimiter = txt_kwargs["delimiter"]

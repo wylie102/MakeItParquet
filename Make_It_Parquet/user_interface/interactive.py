@@ -160,3 +160,28 @@ def prompt_for_input_format(ALIAS_TO_EXTENSION_MAP: dict):
                 "Invalid input format. Please enter a valid input format (note: formats do not include the '.' ."
             )
             continue
+
+
+def determine_excel_options(self):
+    """
+    Set Excel-specific options from args or user prompts.
+    Sets self.sheet and self.range based on args or user input.
+    """
+    # If Excel options are not provided, prompt for them.
+    self.sheet = self.args.sheet
+    self.range = self.args.range
+    if self.sheet is None and self.range is None:
+        self.sheet, self.range = prompt_excel_options(self.input_path)
+
+
+def determine_txt_options(self):
+    """
+    Set TXT-specific options from args or user prompts.
+    """
+    # For TXT output, if no delimiter provided, prompt for it.
+    self.delimiter = self.args.delimiter
+    if self.delimiter is None:
+        self.delimiter = prompt_for_txt_delimiter()
+
+    txt_kwargs = prompt_for_txt_delimiter()
+    self.args.delimiter = txt_kwargs["delimiter"]

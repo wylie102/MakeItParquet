@@ -4,7 +4,7 @@ import argparse
 from typing import Tuple, Optional, TYPE_CHECKING
 import logging
 from pathlib import Path
-from Make_It_Parquet.extension_mapping import ALIAS_TO_EXTENSION_MAP
+from ..extension_mapping import ALIAS_TO_EXTENSION_MAP
 
 if TYPE_CHECKING:
     from user_interface.settings import InputOutputFlags
@@ -37,9 +37,9 @@ def parse_cli_arguments() -> argparse.Namespace:
         "-o", "--output_format", help="Specify output file format", type=str
     )
     # Excel sheet.
-    parser.add_argument("-s", "--sheet", help="Excel sheet (name or number)", type=str)
+    parser.add_argument("-es", "--excel_sheet", help="Excel sheet (name or number)", type=str)
     # Excel range.
-    parser.add_argument("-c", "--range", help="Excel range (e.g., A2:E7)", type=str)
+    parser.add_argument("-er", "--excel_range", help="Excel range (e.g., A2:E7)", type=str)
     # Log level.
     parser.add_argument(
         "--log-level",

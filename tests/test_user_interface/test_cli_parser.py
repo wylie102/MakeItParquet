@@ -36,8 +36,8 @@ def test_parse_cli_arguments_minimal(monkeypatch):
     assert args.output_path is None
     assert args.input_format is None
     assert args.output_format is None
-    assert args.sheet is None
-    assert args.range is None
+    assert args.excel_sheet is None
+    assert args.excel_range is None
     assert args.log_level == "INFO"  # Default value
 
 
@@ -59,9 +59,9 @@ def test_parse_cli_arguments_all_options(monkeypatch):
             "csv",
             "-o",
             "parquet",
-            "-s",
+            "-es",
             "Sheet1",
-            "-c",
+            "-er",
             "A1:B10",
             "--log-level",
             "DEBUG",
@@ -74,8 +74,8 @@ def test_parse_cli_arguments_all_options(monkeypatch):
     assert args.output_path == Path("data/output.parquet")
     assert args.input_format == "csv"
     assert args.output_format == "parquet"
-    assert args.sheet == "Sheet1"
-    assert args.range == "A1:B10"
+    assert args.excel_sheet == "Sheet1"
+    assert args.excel_range == "A1:B10"
     assert args.log_level == "DEBUG"
 
 

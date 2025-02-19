@@ -68,9 +68,9 @@ class InputOutputFlags:
         if environment == "cli":
             self.set_cli_flags(input_ext, output_ext)
         elif environment == "prompt":
-            self.set_prompt_flags(input_ext, output_ext)
+            pass
         elif environment == "auto":
-            self.set_auto_flags(input_ext, output_ext)
+            pass
         else:
             raise ValueError(f"Invalid environment: {environment}")
 

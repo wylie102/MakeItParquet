@@ -25,11 +25,9 @@ class MakeItParquet:
         """
         self.args = parse_cli_arguments()
         self.settings = Settings(self.args)
-        self.conversion_manager = self._create_conversion_manager(self.settings)
+        self.conversion_manager = self._create_conversion_manager()
 
-    def _create_conversion_manager(
-        self, settings: Settings
-    ) -> FileConversionManager | DirectoryConversionManager:
+    def _create_conversion_manager(self):
         """
         Factory function to create a conversion manager based on the input path.
 
@@ -42,10 +40,10 @@ class MakeItParquet:
         Returns:
             FileConversionManager or DirectoryConversionManager: Instance corresponding to the target type.
         """
-        if settings.file_or_dir == "file":
-            return FileConversionManager(settings)
+        if self.settings.file_or_dir == "file":
+            return FileConversionManager(self)
         else:
-            return DirectoryConversionManager(settings)
+            return DirectoryConversionManager(self)
 
     def exit_program(self, message: str, error_type: Optional[str] = "error") -> None:
         """

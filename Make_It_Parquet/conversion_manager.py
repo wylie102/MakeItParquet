@@ -13,15 +13,18 @@ The managers handle:
 - Coordinating import/export operations
 """
 
-from user_interface import logger
 import os
-from pathlib import Path
 import queue
-from typing import Dict, Tuple, Optional, Set, Union
 from collections import defaultdict
+from pathlib import Path
+from typing import TYPE_CHECKING, Dict, Optional, Set, Tuple, Union
 
-from user_interface.settings import Settings
 import converters as conv
+from user_interface import logger
+from user_interface.settings import Settings
+
+if TYPE_CHECKING:
+    from Make_It_Parquet import MakeItParquet
 
 
 class BaseConversionManager:
@@ -47,27 +50,18 @@ class BaseConversionManager:
         file_or_dir (str): Whether input path is a 'file' or 'dir'
     """
 
-    def __init__(self, settings: Settings):
+    def __init__(self, mp: "MakeItParquet"):
         """
         Initialize the conversion manager.
         """
-        # Attach settings object.
-        self.settings: Settings = settings
-        self.settings.conversion_manager = self  # BaseConversionManager
-        self.logger: Optional[logger.Logger] = settings.logger
-
+        # Attach MakeItParquet instance to the conversion manager.
+        self.mp = mp
+        # Attach Settings instance to the conversion manager.
+        self.settings = mp.settings
         # Store parsed CLI arguments by copying from Settings.
-        self.input_path: Path = self.settings.input_path
-        self.input_ext: Optional[str] = self.settings.passed_input_format_ext
-        self.output_ext: Optional[str] = self.settings.passed_output_format_ext
-
-        # Initialise the import and export queues.
-        self.import_queue: queue.Queue[Tuple[Path, str, int]] = queue.Queue()
-        self.export_queue: queue.Queue[Tuple[Path, str, int]] = queue.Queue()
-
-        # Initialise import and export class variables.
-        self.import_class: Optional[conv.BaseInputConnection] = None
-        self.export_class: Optional[conv.BaseOutputConnection] = None
+        self.input_path: Path = self.mp.settings.path
+        self.input_ext: Optional[str] = self.mp.settings.input_ext
+        self.output_ext: Optional[str] = self.settings.output_ext
 
         # File or directory.
         self.file_or_dir: str = self.settings.file_or_dir

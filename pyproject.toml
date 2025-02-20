@@ -3,22 +3,24 @@ name = "Make-it-Parquet"
 version = "0.1.0"
 description = "A file conversion tool powered by DuckDB."
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.12"
 dependencies = [
     "duckdb>=1.2.0",
 ]
 
-[project.optional-dependencies]
+[dependency-groups]
 dev = [
   "pytest",
   "pytest-xdist",
   "pytest-cov",
   "pytest-mock",
-  "isort",
-  "mypy",
-  "ruff",
   "coverage",
   "debugpy",
-  "bandit",
   "pytest-html",
+  "pynvim",
+  "mypy",
+  "ruff",
+  "isort",
+  "bandit",
 ]
+

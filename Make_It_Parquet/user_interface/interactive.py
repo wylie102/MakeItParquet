@@ -112,7 +112,7 @@ def prompt_for_output_format(settings: "Settings", ALIAS_TO_EXTENSION_MAP: dict)
                 )
                 # Wishes to change from detected input extension.
                 if input_answer.lower() == "y":
-                    prompt_for_input_format()
+                    prompt_for_input_format(ALIAS_TO_EXTENSION_MAP)
                 # Wishes to keep detected input extension.
                 else:
                     logging.info("Please enter a different output format.")

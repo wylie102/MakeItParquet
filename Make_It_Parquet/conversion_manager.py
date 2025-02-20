@@ -17,12 +17,14 @@ import os
 from collections import defaultdict
 from pathlib import Path
 from typing import TYPE_CHECKING, Dict, Optional, Set, Union
+from user_interface.interactive import prompt_for_output_format
 
 import converters as conv
-from user_interface.settings import Settings
+from extension_mapping import ALIAS_TO_EXTENSION_MAP, ALLOWED_FILE_EXTENSIONS
 from file_information import (
     create_file_info_dict,
     determine_file_or_dir,
+    determine_path_or_direntry,
     generate_file_stat,
     resolve_path,
 )
@@ -62,42 +64,21 @@ class BaseConversionManager:
         self.mp = mp
         # Attach Settings instance to the conversion manager.
         self.settings = mp.settings
+
+        # Store file information.
+        self.file_info_dict = self.settings.file_info_dict
+
         # Store parsed CLI arguments by copying from Settings.
-        self.input_path: Path = self.mp.settings.file_info_dict["path"]
+        self.input_path: Path = self.file_info_dict["path"]
         self.input_ext: Optional[str] = self.mp.settings.input_ext
         self.output_ext: Optional[str] = self.settings.output_ext
 
         # File or directory.
         self.file_or_dir: str = self.settings.file_or_dir
-        # Subclasses are split by file or directory on instantiation.
 
-    def _get_file_info(
-        self, entry: Union[os.DirEntry, Path]
-    ) -> Dict[str, Union[Path, str, int, str]]:
-        """
-        Extract metadata from a file entry. Accepts an os.DirEntry or a Path.
-
-        Args:
-            entry (Union[os.DirEntry, Path]): The file entry, either from os.scandir() or a Path.
-
-        Returns:
-            Dict[str, Union[Path, str, int]]: A dictionary containing file metadata.
-        """
-        if isinstance(entry, os.DirEntry):
-            file_path = Path(entry.path)
-            name = entry.name
-            stat_info = entry.stat()  # Cached metadata
-        elif isinstance(entry, Path):
-            file_path = entry
-            name = entry.name
-            stat_info = entry.stat()
-
-        return {
-            "path": file_path,
-            "name": name,
-            "size": stat_info.st_size,
-            "ext": file_path.suffix.lower(),
-        }
+        # Initialize queues for import/export.
+        self.import_queue = queue.Queue()
+        self.export_queue = queue.Queue()
 
     def _generate_import_class(self):
         """
@@ -114,14 +95,11 @@ class BaseConversionManager:
         """
 
         if self.input_ext == "excel":
-            if self.output_ext in (".csv", ".tsv", ".txt"):
-                return conv.ExcelInputUntyped()
-            elif self.output_ext in (".parquet", ".json", None):
-                return conv.ExcelInputTyped()
-            else:
-                raise ValueError(
-                    f"Unsupported output extension for Excel: {self.output_ext}"
-                )
+            if self.output_ext:
+                if self.output_ext in (".csv", ".tsv", ".txt"):
+                    return conv.ExcelInputUntyped()
+                elif self.output_ext in (".parquet", ".json", None):
+                    return conv.ExcelInputTyped()
 
         if self.input_ext in conv.import_class_map:
             return conv.import_class_map[self.input_ext]()
@@ -230,7 +208,7 @@ class BaseConversionManager:
         one. Validates that output format differs from input format.
         """
         if not self.output_ext:
-            self.settings.prompt_for_output_format()
+            prompt_for_output_format(self.settings, ALIAS_TO_EXTENSION_MAP)
 
     def _generate_export_class(self):
         """
@@ -271,14 +249,12 @@ class FileConversionManager(BaseConversionManager):
     """
 
     def __init__(self, mp: "MakeItParquet"):
-        super().__init__()
-        # Get file info.
-        self.file_info = create_file_info_dict(self.input_path)
+        super().__init__(mp)
+
         # Check input extension and generate import class.
         self._check_input_extension()
         self.import_class = self._generate_import_class()
-        # Add file to import queue.
-        self.import_queue.put(self.file_info)
+        self._start_conversion_process()
 
         # Determine the output extension.
         self._determine_output_extension()
@@ -299,11 +275,13 @@ class FileConversionManager(BaseConversionManager):
         """
         # Determine the input extension.
         if not self.input_ext:
-            self.input_ext = self.file_info["ext"]
+            self.input_ext = self.file_info_dict["file_extension"]
 
-        if self.input_ext not in self.ALLOWED_FILE_EXTENSIONS:
-            self.settings._exit_program(
-                f"Invalid file extension: {self.input_ext}. Allowed: {self.ALLOWED_FILE_EXTENSIONS}"
+        if (
+            self.input_ext not in ALLOWED_FILE_EXTENSIONS
+        ):  # TODO consider changing to allow re-entering of input extension
+            self.mp.exit_program(
+                f"Invalid file extension: {self.input_ext}. Allowed: {ALLOWED_FILE_EXTENSIONS}"
             )
 
 
@@ -319,8 +297,8 @@ class DirectoryConversionManager(BaseConversionManager):
             Each tuple contains (file_path, file_name, file_size)
     """
 
-    def __init__(self, settings: Settings):
-        super().__init__(settings)
+    def __init__(self, mp: "MakeItParquet"):
+        super().__init__(mp)
         self.file_dictionary: Dict[str, Dict[str, Union[Path, str, int, str]]] = {}
         self._generate_file_dictionary()
         self._order_files_by_size()

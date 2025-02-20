@@ -3,7 +3,7 @@
 from pathlib import Path
 import os
 import stat
-from typing import Union
+from typing import Union, TypedDict
 
 
 def resolve_path(input_path: Path) -> Path:
@@ -31,8 +31,6 @@ def determine_file_or_dir(obj: Union[Path, os.stat_result]) -> str:
         return _file_or_dir_from_path(obj)
     elif isinstance(obj, os.stat_result):
         return _file_or_dir_from_stat(obj)
-    else:
-        raise TypeError("Expected a pathlib.Path or os.stat_result")
 
 
 def _file_or_dir_from_path(path: Path) -> str:
@@ -60,13 +58,27 @@ def file_extension(path: Path) -> str:
     return path.suffix
 
 
-def create_file_info_dict(input_path: Path) -> dict:
+class FileInfoDict(TypedDict):
+    path: Path
+    stat_obj: os.stat_result
+    file_name: str
+    file_size: int
+    file_extension: str
+
+
+def create_file_info_dict(input_path: Path) -> FileInfoDict:
     """Creates an info dictionary for the given input path."""
     path = resolve_path(input_path)
     stat_obj = generate_file_stat(path)
     return {
         "path": path,
-        "file_size": file_size(stat_obj),
+        "stat_obj": stat_obj,
         "file_name": file_name(path),
+        "file_size": file_size(stat_obj),
         "file_extension": file_extension(path),
     }
+
+
+def determine_path_or_direntry(input: Union[Path, os.stat_result]) -> str:
+    """Determines if the input is a path or a directory entry."""
+    return "path" if isinstance(input, Path) else "direntry"

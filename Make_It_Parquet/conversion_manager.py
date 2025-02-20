@@ -14,17 +14,21 @@ The managers handle:
 """
 
 import os
-import queue
 from collections import defaultdict
 from pathlib import Path
-from typing import TYPE_CHECKING, Dict, Optional, Set, Tuple, Union
+from typing import TYPE_CHECKING, Dict, Optional, Set, Union
 
 import converters as conv
-from user_interface import logger
 from user_interface.settings import Settings
+from file_information import (
+    create_file_info_dict,
+    determine_file_or_dir,
+    generate_file_stat,
+    resolve_path,
+)
 
 if TYPE_CHECKING:
-    from Make_It_Parquet import MakeItParquet
+    from make_it_parquet import MakeItParquet
 
 
 class BaseConversionManager:
@@ -59,7 +63,7 @@ class BaseConversionManager:
         # Attach Settings instance to the conversion manager.
         self.settings = mp.settings
         # Store parsed CLI arguments by copying from Settings.
-        self.input_path: Path = self.mp.settings.path
+        self.input_path: Path = self.mp.settings.file_info_dict["path"]
         self.input_ext: Optional[str] = self.mp.settings.input_ext
         self.output_ext: Optional[str] = self.settings.output_ext
 
@@ -87,8 +91,6 @@ class BaseConversionManager:
             file_path = entry
             name = entry.name
             stat_info = entry.stat()
-        else:
-            raise TypeError("Expected os.DirEntry or pathlib.Path")
 
         return {
             "path": file_path,
@@ -268,10 +270,10 @@ class FileConversionManager(BaseConversionManager):
         Inherits all attributes from BaseConversionManager
     """
 
-    def __init__(self, settings: Settings):
-        super().__init__(settings)
+    def __init__(self, mp: "MakeItParquet"):
+        super().__init__()
         # Get file info.
-        self.file_info = self._get_file_info(self.input_path)
+        self.file_info = create_file_info_dict(self.input_path)
         # Check input extension and generate import class.
         self._check_input_extension()
         self.import_class = self._generate_import_class()
@@ -371,7 +373,9 @@ class DirectoryConversionManager(BaseConversionManager):
         with os.scandir(self.input_path) as entries:
             for entry in entries:
                 if entry.is_file():
-                    file_info = self._get_file_info(entry)
+                    file_info = self._get_file_info(
+                        entry
+                    )  # TODO 19-Feb-2025: Look at using functions from file_information for this.
                     ext = file_info["ext"]
                     if ext in allowed_extensions:
                         file_groups[ext].append(file_info)
@@ -406,6 +410,12 @@ class DirectoryConversionManager(BaseConversionManager):
         self.file_dictionary: Dict[str, Dict[str, Union[Path, str, int, str]]] = (
             file_groups[self.input_ext]
         )
+
+    def _try_using_file_information_functions(self):
+        resolve_path(self.input_path)
+        generate_file_stat(self.input_path)
+        determine_file_or_dir(self.input_path)
+        create_file_info_dict(self.input_path)
 
 
 # TODO: (13-Feb-2025) Implement below when needed. DO NOT DELETE.

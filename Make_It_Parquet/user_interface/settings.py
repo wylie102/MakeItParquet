@@ -1,10 +1,15 @@
 #! /usr/bin/env python3
+"""
+Module for managing application settings and configuration.
+
+This module contains the Settings class, which is responsible for managing and storing information about the files being processed, the input/output extensions, and other settings.
+Additionally, the InputOutputFlags class is used to manage flags related to how the input/output extensions are determined (e.g., from CLI arguments, auto-detected, or prompted).
+"""
 
 from typing import Optional
 from ..file_information import (
-    resolve_path,
+    create_file_info_dict,
     determine_file_or_dir,
-    generate_file_stat,
 )
 import argparse
 from .cli_parser import get_input_output_extensions
@@ -33,10 +38,8 @@ class Settings:
         )
 
         # File information.
-        self.path = resolve_path(self.args.input_path)
-        self.stat = generate_file_stat(self.path)
-        self.file_or_dir = determine_file_or_dir(self.stat)
-
+        self.file_info_dict = create_file_info_dict(self.args.path)
+        self.file_or_dir = determine_file_or_dir(self.file_info_dict["path"])
         # Initialise attributes for additional settings.
         self.excel_settings = None
         self.txt_settings = None

@@ -27,9 +27,9 @@ EXTENSION_TO_ALIAS_MAP: Dict[str, str] = {
 
 # Import class map.
 import_class_map = {
-    "csv": conv.CSVInput,
-    "tsv": conv.TsvInput,
-    "txt": conv.TxtInput,
-    "json": conv.JSONInput,
-    "parquet": conv.ParquetInput,
+    ".csv": conv.CSVInput,
+    ".tsv": conv.TsvInput,
+    ".txt": conv.TxtInput,
+    ".json": conv.JSONInput,
+    ".parquet": conv.ParquetInput,
 }

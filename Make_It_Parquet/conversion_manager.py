@@ -14,17 +14,21 @@ The managers handle:
 """
 
 import os
+import queue
 from collections import defaultdict
 from pathlib import Path
 from typing import TYPE_CHECKING, Dict, Optional, Set, Union
 from user_interface.interactive import prompt_for_output_format
 
 import converters as conv
-from extension_mapping import ALIAS_TO_EXTENSION_MAP, ALLOWED_FILE_EXTENSIONS
+from extension_mapping import (
+    ALIAS_TO_EXTENSION_MAP,
+    ALLOWED_FILE_EXTENSIONS,
+    import_class_map,
+)
 from file_information import (
     create_file_info_dict,
     determine_file_or_dir,
-    determine_path_or_direntry,
     generate_file_stat,
     resolve_path,
 )
@@ -80,6 +84,10 @@ class BaseConversionManager:
         self.import_queue = queue.Queue()
         self.export_queue = queue.Queue()
 
+        # initialize flags for import/export queues.
+        self.import_queue_status_flag_flag = 0  # zero = empty
+        self.export_queue_status_flag = 0  # zero = empty
+
     def _generate_import_class(self):
         """
         Create appropriate input class based on file extension.
@@ -94,17 +102,44 @@ class BaseConversionManager:
             ValueError: If input extension is not supported
         """
 
-        if self.input_ext == "excel":
-            if self.output_ext:
-                if self.output_ext in (".csv", ".tsv", ".txt"):
-                    return conv.ExcelInputUntyped()
-                elif self.output_ext in (".parquet", ".json", None):
-                    return conv.ExcelInputTyped()
+        if not self.input_ext == ".xlsx":
+            self._return_standard_import_class
+        else:
+            self._return_excel_import_class
 
-        if self.input_ext in conv.import_class_map:
-            return conv.import_class_map[self.input_ext]()
+    def _return_standard_import_class(self):
+        """Returns a non-excel import class."""
+        if self.input_ext:
+            return import_class_map[self.input_ext]
 
-        raise ValueError(f"Unsupported input extension: {self.input_ext}")
+    def _return_excel_import_class(self):
+        """Returns an excel import class."""
+        # TODO: 21-Feb-2025: Write excel_utils.py functions/methods to laod excel extension.
+        pass  # TODO: 21-Feb-2025: Refactor excel_utils.py
+
+    def _update_import_queue_status_flag(self):
+        """Checks import queue, if empty, sets flag to 0, else sets flag to 1."""
+        if self.import_queue.empty():
+            self.import_queue_status_flag = 0
+        else:
+            self.import_queue_status_flag = 1
+
+    def _update_export_queue_status_flag(self):
+        """Checks export queue, if empty, sets flag to 0, else sets flag to 1."""
+        if self.export_queue.empty():
+            self.export_queue_status_flag = 0
+        else:
+            self.export_queue_status_flag = 1
+
+    def _import_and_export_queues_empty(self):
+        """Returns True if both import and export queues are empty, else returns false."""
+        if (
+            self.import_queue_status_flag_flag == 0
+            and self.export_queue_status_flag == 0
+        ):
+            return True
+        else:
+            return False
 
     def _start_conversion_process(self):
         """
@@ -117,88 +152,8 @@ class BaseConversionManager:
         # and self.export_queue is initially empty.
         # Also, assume self.output_ext is None until set externally.
 
-        mode = "bulk_import"
-
-        while not self.import_queue.empty() or not self.export_queue.empty():
-            if mode == "bulk_import":
-                # While output_ext is not yet received, import files as fast as possible
-                while not self.import_queue.empty() and self.output_ext is None:
-                    file_info = self.import_queue.get()
-                    self.logger.info(f"Bulk importing {file_info['name']}")
-                    try:
-                        # Import the file – you'll have a method like import_file() in your import class
-                        imported_data = self.import_class.import_file(file_info["path"])
-                    except Exception as e:
-                        self.logger.error(f"Error importing {file_info['name']}: {e}")
-                        self.import_queue.task_done()
-                        continue
-                    # Once imported, add to the export queue (even though we cannot export yet).
-                    self.export_queue.put(
-                        {
-                            "data": imported_data,
-                            "file_info": file_info,
-                            "output_extension": self.output_ext,  # likely still None here
-                        }
-                    )
-                    self.import_queue.task_done()
-
-                # Check if the output extension has been set;
-                # if so, we switch to draining mode.
-                if self.output_ext is not None:
-                    mode = "draining"
-                else:
-                    # If no more files to import, break out.
-                    if self.import_queue.empty():
-                        break
-
-            elif mode == "draining":
-                self.logger.info(
-                    "Output extension received. Draining the export queue..."
-                )
-                # Process the exports that have accumulated.
-                while not self.export_queue.empty():
-                    export_item = self.export_queue.get()
-                    try:
-                        # Process export through your export class.
-                        self.export_class.export_file(export_item)
-                        self.logger.info(f"Exported {export_item['file_info']['name']}")
-                    except Exception as e:
-                        self.logger.error(
-                            f"Error exporting {export_item['file_info']['name']}: {e}"
-                        )
-                    self.export_queue.task_done()
-                # After draining, switch to balanced mode.
-                mode = "balanced"
-
-            elif mode == "balanced":
-                # Now process one import then one export at a time.
-                if not self.import_queue.empty():
-                    file_info = self.import_queue.get()
-                    self.logger.info(f"Balanced import of {file_info['name']}")
-                    try:
-                        imported_data = self.import_class.import_file(file_info["path"])
-                    except Exception as e:
-                        self.logger.error(f"Error importing {file_info['name']}: {e}")
-                        self.import_queue.task_done()
-                        continue
-                    # Immediately process export.
-                    try:
-                        self.export_class.export_file(
-                            {
-                                "data": imported_data,
-                                "file_info": file_info,
-                                "output_extension": self.output_ext,
-                            }
-                        )
-                        self.logger.info(f"Balanced export of {file_info['name']}")
-                    except Exception as e:
-                        self.logger.error(
-                            f"Error exporting (balanced) {file_info['name']}: {e}"
-                        )
-                    self.import_queue.task_done()
-                else:
-                    # If both queues are empty, break out.
-                    break
+        if self._import_and_export_queues_empty():
+            pass  # TODO: NEXT finish implementing this method.
 
     def _determine_output_extension(self):
         """
@@ -279,7 +234,7 @@ class FileConversionManager(BaseConversionManager):
 
         if (
             self.input_ext not in ALLOWED_FILE_EXTENSIONS
-        ):  # TODO consider changing to allow re-entering of input extension
+        ):  # TODO consider changing to allow re-entering of input extension or checking the input/output flags, and/or performing a manual check on the input type
             self.mp.exit_program(
                 f"Invalid file extension: {self.input_ext}. Allowed: {ALLOWED_FILE_EXTENSIONS}"
             )

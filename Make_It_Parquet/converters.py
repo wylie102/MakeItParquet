@@ -23,7 +23,7 @@ class BaseInputConnection:
     def __init__(self):
         self.conn = duckdb.connect()
 
-    def import_file(self, path: Path):
+    def _import_file(self, path: Path):
         """
         Import a file into the duckdb.
         """
@@ -40,7 +40,7 @@ class CSVInput(BaseInputConnection):
 
     def __init__(self):
         super().__init__()
-
+        self.import_statement = read_csv(f"file_info_dict["path"]")
 
 class JSONInput(BaseInputConnection):
     """
@@ -52,7 +52,7 @@ class JSONInput(BaseInputConnection):
 
     def __init__(self):
         super().__init__()
-        pass
+        self.import_statement = read_json(f"file_info_dict["path"]")
 
 
 class ParquetInput(BaseInputConnection):
@@ -65,7 +65,7 @@ class ParquetInput(BaseInputConnection):
 
     def __init__(self):
         super().__init__()
-        pass
+        self.import_statement = from_parquet(f"file_info_dict["path"]")
 
 
 class TsvInput(CSVInput):
@@ -78,7 +78,7 @@ class TsvInput(CSVInput):
 
     def __init__(self):
         super().__init__()
-        pass
+        self.import_statement = read_csv(f"file_info_dict["path"]", sep="\t")
 
 
 class TxtInput(CSVInput):
@@ -91,7 +91,7 @@ class TxtInput(CSVInput):
 
     def __init__(self):
         super().__init__()
-        pass
+        self.import_statement = read_csv(f"file_info_dict["path"]", sep=",")
 
 
 class ExcelInputUntyped(BaseInputConnection):
@@ -104,7 +104,7 @@ class ExcelInputUntyped(BaseInputConnection):
 
     def __init__(self):
         super().__init__()
-        pass
+        pass # TODO look at excel import statements in excel_utils.py
 
 
 class ExcelInputTyped(ExcelInputUntyped):
@@ -145,7 +145,7 @@ class ParquetOutput(BaseOutputConnection):
 
     def __init__(self):
         super().__init__()
-        pass
+        self.export_statement = write_parquet(f"file_info_dict["path"]")
 
 
 class JSONOutput(BaseOutputConnection):
@@ -158,7 +158,7 @@ class JSONOutput(BaseOutputConnection):
 
     def __init__(self):
         super().__init__()
-        pass
+        self.export_statement = write_json(f"file_info_dict["path"]")
 
 
 class CSVOutput(BaseOutputConnection):
@@ -171,7 +171,7 @@ class CSVOutput(BaseOutputConnection):
 
     def __init__(self):
         super().__init__()
-        pass
+        self.export_statement = write_csv(f"file_info_dict["path"]")
 
 
 class TsvOutput(CSVOutput):
@@ -184,7 +184,7 @@ class TsvOutput(CSVOutput):
 
     def __init__(self):
         super().__init__()
-        pass
+        self.export_statement = write_csv(f"file_info_dict["path"]", sep="\t")
 
 
 class TxtOutput(CSVOutput):
@@ -197,7 +197,7 @@ class TxtOutput(CSVOutput):
 
     def __init__(self):
         super().__init__()
-        pass
+        self.export_statement = write_csv(f"file_info_dict["path"]", sep=",")
 
 
 class ExcelOutput(BaseOutputConnection):
@@ -210,7 +210,7 @@ class ExcelOutput(BaseOutputConnection):
 
     def __init__(self):
         super().__init__()
-        pass
+        pass # TODO check excel_utils.py for export statements.
 
 
 #

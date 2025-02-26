@@ -17,8 +17,7 @@ import os
 import queue
 from collections import defaultdict
 from pathlib import Path
-from typing import TYPE_CHECKING, Dict, Optional, Set, Union
-from user_interface.interactive import prompt_for_output_format
+from typing import TYPE_CHECKING, Dict, List, Optional, Union
 
 import converters as conv
 from extension_mapping import (
@@ -26,12 +25,8 @@ from extension_mapping import (
     ALLOWED_FILE_EXTENSIONS,
     import_class_map,
 )
-from file_information import (
-    create_file_info_dict,
-    determine_file_or_dir,
-    generate_file_stat,
-    resolve_path,
-)
+from file_information import FileInfoDict, create_file_info_dict_from_scandir
+from user_interface.interactive import prompt_for_input_format, prompt_for_output_format
 
 if TYPE_CHECKING:
     from make_it_parquet import MakeItParquet
@@ -42,7 +37,7 @@ class BaseConversionManager:
     Base class for file and directory conversion managers.
 
     Provides common functionality for managing file conversions including:
-    - Queue management for imports/exports
+     management for imports/exports
     - Input/output format validation
     - Import/export class generation
 
@@ -153,7 +148,8 @@ class BaseConversionManager:
         # Also, assume self.output_ext is None until set externally.
 
         if self._import_and_export_queues_empty():
-            pass  # TODO: NEXT finish implementing this method.
+            if self.output_ext is None:
+                pass  # TODO: NEXT finish implementing this method.
 
     def _determine_output_extension(self):
         """
@@ -254,10 +250,9 @@ class DirectoryConversionManager(BaseConversionManager):
 
     def __init__(self, mp: "MakeItParquet"):
         super().__init__(mp)
-        self.file_dictionary: Dict[str, Dict[str, Union[Path, str, int, str]]] = {}
+        self.file_list: List[Dict[str, Union[Path, str, int, str]]] = []
         self._generate_file_dictionary()
         self._order_files_by_size()
-        self._convert_directory()
 
     def _order_files_by_size(self):
         """
@@ -265,18 +260,18 @@ class DirectoryConversionManager(BaseConversionManager):
 
         Orders files from smallest to largest to optimize processing.
         """
-        self.file_dictionary.sort(key=lambda x: x[2])
+        # self.file_dictionary.sort(key=lambda x: x[2]) TODO 26-Feb-2025: fix this
 
-    def _convert_directory(self):
-        """
-        Initialize directory conversion.
-
-        Determines input format if not specified and populates file dictionary.
-        """
-        if self.input_ext:
-            self.file_dictionary = self._generate_directory_info(self.input_ext)[1]
-        else:
-            self.input_ext, self.file_dictionary = self._generate_directory_info()
+    def _add_to_extension_list(
+        self,
+        file_groups: defaultdict,
+        extension_counts: defaultdict,
+        file_info: FileInfoDict,
+    ):
+        ext = file_info["file_extension"]
+        if ext in ALLOWED_FILE_EXTENSIONS:
+            file_groups[ext].append(file_info)
+        extension_counts[ext] += 1
 
     def _generate_file_dictionary(self):
         """
@@ -284,41 +279,22 @@ class DirectoryConversionManager(BaseConversionManager):
 
         Scans the directory for files matching the allowed extensions and groups them by extension.
         At the same time, counts the number of files for each extension.
-
-        Args:
-            input_ext (Optional[str]): File extension to filter by (e.g. '.csv', '.json'). If provided,
-                                       then only files with that extension are considered.
-
-        Returns:
-            Tuple containing:
-                - str: The chosen or majority extension.
-                - List[Tuple[Path, str, int]]: A list of tuples for the files of the majority extension.
-                  Each tuple contains the full file path, the file name, and the file size in bytes.
-                - Dict[str, int]: A dictionary mapping each extension to the count of files for that extension.
-
-        Raises:
-            SystemExit: If no compatible files are found in the directory.
         """
-        allowed_extensions: Set[str] = self.ALLOWED_FILE_EXTENSIONS.copy()
         file_groups = defaultdict(list)
         extension_counts = defaultdict(int)
-
         with os.scandir(self.input_path) as entries:
             for entry in entries:
                 if entry.is_file():
-                    file_info = self._get_file_info(
-                        entry
-                    )  # TODO 19-Feb-2025: Look at using functions from file_information for this.
-                    ext = file_info["ext"]
-                    if ext in allowed_extensions:
-                        file_groups[ext].append(file_info)
-                        extension_counts[ext] += 1
+                    file_info = create_file_info_dict_from_scandir(entry)
+                    self._add_to_extension_list(
+                        file_groups, extension_counts, file_info
+                    )  # TODO 26-Feb-2025: think of better name for this method
 
         # Check if any files have been found
-        if not extension_counts:
-            return self.settings._exit_program(
-                "No compatible file types found", error_type="error"
-            )
+        if (
+            not extension_counts
+        ):  # TODO 26-Feb-2025: further refactor the generation of the file dictionary
+            self.mp.exit_program("No compatible file types found", error_type="error")
 
         # Determine the majority extension (if a tie occurs, ask the user to specify the extension).
         # Order the extensions by count in descending order.
@@ -332,23 +308,17 @@ class DirectoryConversionManager(BaseConversionManager):
                 extension_counts[sorted_extensions[0]]
                 == extension_counts[sorted_extensions[1]]
             ):
-                self.logger.error(
+                self.settings.logger.error(
                     f"Ambiguous file types found {sorted_extensions}. Please specify which one to convert."
                 )
-                self.settings._prompt_for_input_format()
+                prompt_for_input_format(ALIAS_TO_EXTENSION_MAP)
             else:
                 self.input_ext = sorted_extensions[0]
-                self.settings.input_ext_auto_detected_flag = 1
+                self.settings.input_output_flags.set_flags("auto", self.input_ext, None)
 
-        self.file_dictionary: Dict[str, Dict[str, Union[Path, str, int, str]]] = (
-            file_groups[self.input_ext]
-        )
-
-    def _try_using_file_information_functions(self):
-        resolve_path(self.input_path)
-        generate_file_stat(self.input_path)
-        determine_file_or_dir(self.input_path)
-        create_file_info_dict(self.input_path)
+        self.file_list: List[Dict[str, Union[Path, str, int, str]]] = file_groups[
+            self.input_ext
+        ]
 
 
 # TODO: (13-Feb-2025) Implement below when needed. DO NOT DELETE.

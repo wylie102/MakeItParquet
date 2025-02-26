@@ -66,7 +66,7 @@ class FileInfoDict(TypedDict):
     file_extension: str
 
 
-def create_file_info_dict(input_path: Path) -> FileInfoDict:
+def create_file_info_dict_from_path(input_path: Path) -> FileInfoDict:
     """Creates an info dictionary for the given input path."""
     path = resolve_path(input_path)
     stat_obj = generate_file_stat(path)
@@ -79,6 +79,14 @@ def create_file_info_dict(input_path: Path) -> FileInfoDict:
     }
 
 
-def determine_path_or_direntry(input: Union[Path, os.stat_result]) -> str:
-    """Determines if the input is a path or a directory entry."""
-    return "path" if isinstance(input, Path) else "direntry"
+def create_file_info_dict_from_scandir(entry: os.DirEntry) -> FileInfoDict:
+    """Creates an info dictionary for the given input path."""
+    path = resolve_path(entry.path)
+    stat_obj = generate_file_stat(path)
+    return {
+        "path": path,
+        "stat_obj": stat_obj,
+        "file_name": file_name(path),
+        "file_size": file_size(stat_obj),
+        "file_extension": file_extension(path),
+    }

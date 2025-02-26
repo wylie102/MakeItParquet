@@ -4,9 +4,7 @@ version = "0.1.0"
 description = "A file conversion tool powered by DuckDB."
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = [
-    "duckdb>=1.2.0",
-]
+dependencies = ["duckdb>=1.2.0"]
 
 [dependency-groups]
 dev = [
@@ -24,3 +22,5 @@ dev = [
   "bandit",
 ]
 
+[tool.sqlfluff.core]
+dialect = "athena"

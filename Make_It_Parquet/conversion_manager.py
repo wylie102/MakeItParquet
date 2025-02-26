@@ -250,6 +250,11 @@ class DirectoryConversionManager(BaseConversionManager):
 
     def __init__(self, mp: "MakeItParquet"):
         super().__init__(mp)
+
+        self.file_groups = defaultdict(list)
+        self.extension_counts = defaultdict(int)
+        self.dir_file_list = []
+
         self.file_list: List[Dict[str, Union[Path, str, int, str]]] = []
         self._generate_file_dictionary()
         self._order_files_by_size()
@@ -262,109 +267,103 @@ class DirectoryConversionManager(BaseConversionManager):
         """
         # self.file_dictionary.sort(key=lambda x: x[2]) TODO 26-Feb-2025: fix this
 
-    def _add_to_extension_list(
-        self,
-        file_groups: defaultdict,
-        extension_counts: defaultdict,
-        file_info: FileInfoDict,
-    ):
-        ext = file_info["file_extension"]
-        if ext in ALLOWED_FILE_EXTENSIONS:
-            file_groups[ext].append(file_info)
-        extension_counts[ext] += 1
-
-    def _generate_file_dictionary(self):
-        """
-        Generate information about files in the directory.
-
-        Scans the directory for files matching the allowed extensions and groups them by extension.
-        At the same time, counts the number of files for each extension.
-        """
-        file_groups = defaultdict(list)
-        extension_counts = defaultdict(int)
+    def _create_list_of_file_info_dicts(self):
+        """Create a list of file information dictionaries from the directory."""
         with os.scandir(self.input_path) as entries:
             for entry in entries:
                 if entry.is_file():
                     file_info = create_file_info_dict_from_scandir(entry)
-                    self._add_to_extension_list(
-                        file_groups, extension_counts, file_info
-                    )  # TODO 26-Feb-2025: think of better name for this method
+                    self.dir_file_list.append(file_info)
 
-        # Check if any files have been found
-        if (
-            not extension_counts
-        ):  # TODO 26-Feb-2025: further refactor the generation of the file dictionary
+    def _group_files_by_extension(self):
+        """Group files by extension and count the number of files for each extension."""
+        for file_info in self.dir_file_list:
+            ext = file_info["file_extension"]
+            if ext in ALLOWED_FILE_EXTENSIONS:
+                self.file_groups[ext].append(file_info)
+                self.extension_counts[ext] += 1
+
+    def _exit_if_no_files(self):
+        """Exit the program if no compatible file types are found."""
+        if not self.extension_counts:
             self.mp.exit_program("No compatible file types found", error_type="error")
 
-        # Determine the majority extension (if a tie occurs, ask the user to specify the extension).
-        # Order the extensions by count in descending order.
-        sorted_extensions = sorted(
-            extension_counts, key=lambda x: extension_counts[x], reverse=True
-        )
+    def _generate_file_dictionary(self):
+        """
+        Generate information about files in the directory.
+        Scans the directory for files matching the allowed extensions and groups them by extension.
+        """
+        self._create_list_of_file_info_dicts()
+        self._group_files_by_extension()
+        self._exit_if_no_files()
 
-        # Check for ambiguity: if more than one alias has the top count, ask the user to specify.
-        if len(sorted_extensions) > 1:
-            if (
-                extension_counts[sorted_extensions[0]]
-                == extension_counts[sorted_extensions[1]]
-            ):
+    def _sort_extensions_by_count(self):
+        """Sort the extensions by the number of files in each group."""
+        self.extension_counts = dict(
+            sorted(self.extension_counts.items(), key=lambda item: item[1], reverse=True)
+
+    def _check_for_ambiguous_file_types(self):
+        """Check if there are ambiguous file types and prompt for input if necessary."""
+        if len(self.extension_counts) > 1:
+            top_keys = list(self.extension_counts.keys())
+            if self.extension_counts[top_keys[0]] == self.extension_counts[top_keys[1]]:
                 self.settings.logger.error(
-                    f"Ambiguous file types found {sorted_extensions}. Please specify which one to convert."
+                    f"Ambiguous file types found {self.extension_counts}. Please specify which one to convert."
                 )
                 prompt_for_input_format(ALIAS_TO_EXTENSION_MAP)
-            else:
-                self.input_ext = sorted_extensions[0]
-                self.settings.input_output_flags.set_flags("auto", self.input_ext, None)
+                return True
+        return False
 
-        self.file_list: List[Dict[str, Union[Path, str, int, str]]] = file_groups[
-            self.input_ext
-        ]
+    def _set_input_extension_and_file_list(self):
+        """Set the input extension and update the flags."""
+        self.input_ext = list(self.extension_counts.keys())[0]
+        self.file_list = self.file_groups[self.input_ext]
+
+    def _auto_detect_majority_extension(self):
+        """determine the majority file extension in the directory."""
+        # Check for ambiguity: if more than one alias has the top count, ask the user to specify.
+        self._sort_extensions_by_count()
+        if not self._check_for_ambiguous_file_types():
+            self._set_input_extension_and_file_list()
+            self.settings.input_output_flags.set_flags("auto", self.input_ext, None)
 
 
 # TODO: (13-Feb-2025) Implement below when needed. DO NOT DELETE.
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-# def _replace_alias_in_string(self) -> str:
-#     pattern = re.compile(re.escape(self.input_ext), re.IGNORECASE)
-
-# def replacer(match: re.Match) -> str:
-#     orig = match.group()
-#     if orig.isupper():
-#             return self.input_ext.upper()
-#     elif orig.islower():
-#             return self.input_ext.lower()
-#     elif orig[0].isupper() and orig[1:].islower():
-#         return self.input_ext.capitalize()
-#     else:
-#         return self.input_ext
-
-#     result, count = pattern.subn(replacer, self.input_ext)
-#     if count == 0:
-#         result = f"{self.input_ext}"
-#     return result
-
-# def _generate_output_name(self) -> str:
-#     if self.input_ext and self.input_ext.lower() in self.input_path.name.lower():
-#         return self._replace_alias_in_string()
-#     else:
-#         return f"{self.input_path.name}_{self.output_ext}"
 
 
-# def generate_output_path(input_path: Path, output_ext: str) -> Path:
-#     return input_path.with_suffix(f".{output_ext}")
+def _replace_alias_in_string(self) -> str:
+    pattern = re.compile(re.escape(self.input_ext), re.IGNORECASE)
 
-# def get_conversion_params(input_path: Path, input_ext: str) -> Tuple[List[Path], None, str]:
-#     return ([input_path], None, input_ext.lstrip("."))
+
+def replacer(match: re.Match) -> str:
+    orig = match.group()
+    if orig.isupper():
+        return self.input_ext.upper()
+    elif orig.islower():
+        return self.input_ext.lower()
+    elif orig[0].isupper() and orig[1:].islower():
+        return self.input_ext.capitalize()
+    else:
+        return self.input_ext
+
+    result, count = pattern.subn(replacer, self.input_ext)
+    if count == 0:
+        result = f"{self.input_ext}"
+    return result
+
+
+def _generate_output_name(self) -> str:
+    if self.input_ext and self.input_ext.lower() in self.input_path.name.lower():
+        return self._replace_alias_in_string()
+    else:
+        return f"{self.input_path.name}_{self.output_ext}"
+
+
+def generate_output_path(input_path: Path, output_ext: str) -> Path:
+    return input_path.with_suffix(f".{output_ext}")
+
+
+def get_conversion_params(
+    input_path: Path, input_ext: str
+) -> Tuple[List[Path], None, str]:
+    return ([input_path], None, input_ext.lstrip("."))

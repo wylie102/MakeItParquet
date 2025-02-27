@@ -28,7 +28,7 @@ class Settings:
         # CLI arguments.
         self.args = args
         # Logger.
-        self.logger = Logger(self.args.log_level).logger
+        self.logger = Logger(self.args.log_level)
         # Input/output flags.
         self.input_output_flags = InputOutputFlags()
 

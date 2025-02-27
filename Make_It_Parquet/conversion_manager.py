@@ -221,6 +221,9 @@ class FileConversionManager(BaseConversionManager):
                 f"Invalid file extension: {self.input_ext}. Allowed: {ALLOWED_FILE_EXTENSIONS}"
             )
 
+    def _start_conversion_process(self):
+        pass  # TODO: 26/02/2025 implement this method.
+
 
 class DirectoryConversionManager(BaseConversionManager):
     """
@@ -307,7 +310,7 @@ class DirectoryConversionManager(BaseConversionManager):
     def _set_input_extension_and_file_list(self):
         """Set input extension and file list. Also updates flags."""
         self.input_ext = list(self.extension_counts.keys())[0]
-        self.settins.input_output_flags.set_flags("auto", self.input_ext, None)
+        self.settings.input_output_flags.set_flags("auto", self.input_ext, None)
         self.conversion_file_list = self.extension_file_groups[self.input_ext]
 
     def _detect_majority_extension(self):
@@ -332,39 +335,39 @@ class DirectoryConversionManager(BaseConversionManager):
 # TODO: (13-Feb-2025) Implement below when needed. DO NOT DELETE.
 
 
-def _replace_alias_in_string(self) -> str:
-    pattern = re.compile(re.escape(self.input_ext), re.IGNORECASE)
-
-
-def replacer(match: re.Match) -> str:
-    orig = match.group()
-    if orig.isupper():
-        return self.input_ext.upper()
-    elif orig.islower():
-        return self.input_ext.lower()
-    elif orig[0].isupper() and orig[1:].islower():
-        return self.input_ext.capitalize()
-    else:
-        return self.input_ext
-
-    result, count = pattern.subn(replacer, self.input_ext)
-    if count == 0:
-        result = f"{self.input_ext}"
-    return result
-
-
-def _generate_output_name(self) -> str:
-    if self.input_ext and self.input_ext.lower() in self.input_path.name.lower():
-        return self._replace_alias_in_string()
-    else:
-        return f"{self.input_path.name}_{self.output_ext}"
-
-
-def generate_output_path(input_path: Path, output_ext: str) -> Path:
-    return input_path.with_suffix(f".{output_ext}")
-
-
-def get_conversion_params(
-    input_path: Path, input_ext: str
-) -> Tuple[List[Path], None, str]:
-    return ([input_path], None, input_ext.lstrip("."))
+# def _replace_alias_in_string(self) -> str:
+#     pattern = re.compile(re.escape(self.input_ext), re.IGNORECASE)
+#
+#
+# def replacer(match: re.Match) -> str:
+#     orig = match.group()
+#     if orig.isupper():
+#         return self.input_ext.upper()
+#     elif orig.islower():
+#         return self.input_ext.lower()
+#     elif orig[0].isupper() and orig[1:].islower():
+#         return self.input_ext.capitalize()
+#     else:
+#         return self.input_ext
+#
+#     result, count = pattern.subn(replacer, self.input_ext)
+#     if count == 0:
+#         result = f"{self.input_ext}"
+#     return result
+#
+#
+# def _generate_output_name(self) -> str:
+#     if self.input_ext and self.input_ext.lower() in self.input_path.name.lower():
+#         return self._replace_alias_in_string()
+#     else:
+#         return f"{self.input_path.name}_{self.output_ext}"
+#
+#
+# def generate_output_path(input_path: Path, output_ext: str) -> Path:
+#     return input_path.with_suffix(f".{output_ext}")
+#
+#
+# def get_conversion_params(
+#     input_path: Path, input_ext: str
+# ) -> Tuple[List[Path], None, str]:
+#     return ([input_path], None, input_ext.lstrip("."))

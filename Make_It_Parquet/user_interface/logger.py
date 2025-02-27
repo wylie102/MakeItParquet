@@ -4,22 +4,19 @@ import queue
 import sys
 
 
-class Logger:
+class Logger(logging.Logger):
     """
     A logger that can be used to log messages to the console via asynchronous queue based logging.
     """
 
     def __init__(self, log_level: str):
+        super().__init__("Make-it-Parquet!")
         self.log_queue = queue.Queue()
         self.logger = logging.getLogger("Make-it-Parquet!")
 
         self.default_log_level = logging.INFO
         self.supplied_log_level = log_level.strip().upper()
         self.active_log_level = None
-
-        self.console_handler = None
-        self.queue_handler = None
-        self.queue_listener = None
 
         self._configure_logging()
 
@@ -30,9 +27,9 @@ class Logger:
         Sets up queue-based logging with console output.
         """
         self._set_logging_level()
-        self._setup_console_handler()
-        self._setup_queue_handler()
-        self._setup_queue_listener()
+        self.console_handler = self._setup_console_handler()
+        self.queue_handler = self._setup_queue_handler()
+        self.queue_listener = self._setup_queue_listener()
         self.queue_listener.start()
 
     def _set_logging_level(self):
@@ -44,28 +41,31 @@ class Logger:
         )
         self.logger.setLevel(self.active_log_level)
 
-    def _setup_console_handler(self) -> logging.StreamHandler:
+    def _setup_console_handler(self):
         """
         Setup console handler.
         """
-        self.console_handler = logging.StreamHandler(sys.stdout)
+        console_handler = logging.StreamHandler(sys.stdout)
         formatter = logging.Formatter(
             "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
         )
-        self.console_handler.setFormatter(formatter)
+        console_handler.setFormatter(formatter)
+        return console_handler
 
-    def _setup_queue_handler(self) -> QueueHandler:
+    def _setup_queue_handler(self):
         """
         Setup queue handler.
         """
-        self.queue_handler = QueueHandler(self.log_queue)
-        self.logger.addHandler(self.queue_handler)
+        queue_handler = QueueHandler(self.log_queue)
+        self.logger.addHandler(queue_handler)
+        return queue_handler
 
-    def _setup_queue_listener(self) -> QueueListener:
+    def _setup_queue_listener(self):
         """
         Setup queue listener.
         """
-        self.queue_listener = QueueListener(self.log_queue, self.console_handler)
+        queue_listener = QueueListener(self.log_queue, self.console_handler)
+        return queue_listener
 
     def stop_logging(self):
         """

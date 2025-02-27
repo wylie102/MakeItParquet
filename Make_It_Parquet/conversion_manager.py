@@ -15,6 +15,7 @@ The managers handle:
 
 import os
 import queue
+import re
 from collections import defaultdict
 from pathlib import Path
 from typing import TYPE_CHECKING, Dict, List, Optional, Union
@@ -25,7 +26,7 @@ from extension_mapping import (
     ALLOWED_FILE_EXTENSIONS,
     import_class_map,
 )
-from file_information import FileInfoDict, create_file_info_dict_from_scandir
+from file_information import create_file_info_dict_from_scandir
 from user_interface.interactive import prompt_for_input_format, prompt_for_output_format
 
 if TYPE_CHECKING:
@@ -109,7 +110,7 @@ class BaseConversionManager:
 
     def _return_excel_import_class(self):
         """Returns an excel import class."""
-        # TODO: 21-Feb-2025: Write excel_utils.py functions/methods to laod excel extension.
+        # TODO: 21-Feb-2025: Write excel_utils.py functions/methods to load excel extension.
         pass  # TODO: 21-Feb-2025: Refactor excel_utils.py
 
     def _update_import_queue_status_flag(self):
@@ -135,21 +136,6 @@ class BaseConversionManager:
             return True
         else:
             return False
-
-    def _start_conversion_process(self):
-        """
-        Controller that runs through three phases:
-        1. Bulk import until the output extension is received.
-        2. Drain the export queue (export all imported files).
-        3. Process the remaining files in a balanced 1:1 import/export manner.
-        """
-        # Assume self.import_queue is pre-populated in order (largest first)
-        # and self.export_queue is initially empty.
-        # Also, assume self.output_ext is None until set externally.
-
-        if self._import_and_export_queues_empty():
-            if self.output_ext is None:
-                pass  # TODO: NEXT finish implementing this method.
 
     def _determine_output_extension(self):
         """
@@ -244,19 +230,20 @@ class DirectoryConversionManager(BaseConversionManager):
 
     Attributes:
         Inherits all attributes from BaseConversionManager
-        file_dictionary (List[Tuple[Path, str, int]]): List of files to convert
-            Each tuple contains (file_path, file_name, file_size)
     """
 
     def __init__(self, mp: "MakeItParquet"):
         super().__init__(mp)
 
-        self.file_groups = defaultdict(list)
-        self.extension_counts = defaultdict(int)
+        # initialize directory conversion attributes.
         self.dir_file_list = []
+        self.extension_file_groups = defaultdict(list)
+        self.extension_counts = defaultdict(int)
+        self.conversion_file_list: List[Dict[str, Union[Path, str, int, str]]] = []
 
-        self.file_list: List[Dict[str, Union[Path, str, int, str]]] = []
-        self._generate_file_dictionary()
+        # creates and orders self.conversion_file_list.
+        self._generate_extension_file_groups()  # creates dir_file_list, groups files into extension_file_groups, totals extension_counts.
+        self._detect_majority_extension()  # detects majority extension, sets self.input_ext, sets conversion_file_list, updates flags.
         self._order_files_by_size()
 
     def _order_files_by_size(self):
@@ -265,7 +252,7 @@ class DirectoryConversionManager(BaseConversionManager):
 
         Orders files from smallest to largest to optimize processing.
         """
-        # self.file_dictionary.sort(key=lambda x: x[2]) TODO 26-Feb-2025: fix this
+        self.conversion_file_list.sort(key=lambda x: x["file_size"], reverse=True)
 
     def _create_list_of_file_info_dicts(self):
         """Create a list of file information dictionaries from the directory."""
@@ -280,7 +267,7 @@ class DirectoryConversionManager(BaseConversionManager):
         for file_info in self.dir_file_list:
             ext = file_info["file_extension"]
             if ext in ALLOWED_FILE_EXTENSIONS:
-                self.file_groups[ext].append(file_info)
+                self.extension_file_groups[ext].append(file_info)
                 self.extension_counts[ext] += 1
 
     def _exit_if_no_files(self):
@@ -288,7 +275,7 @@ class DirectoryConversionManager(BaseConversionManager):
         if not self.extension_counts:
             self.mp.exit_program("No compatible file types found", error_type="error")
 
-    def _generate_file_dictionary(self):
+    def _generate_extension_file_groups(self):
         """
         Generate information about files in the directory.
         Scans the directory for files matching the allowed extensions and groups them by extension.
@@ -300,7 +287,10 @@ class DirectoryConversionManager(BaseConversionManager):
     def _sort_extensions_by_count(self):
         """Sort the extensions by the number of files in each group."""
         self.extension_counts = dict(
-            sorted(self.extension_counts.items(), key=lambda item: item[1], reverse=True)
+            sorted(
+                self.extension_counts.items(), key=lambda item: item[1], reverse=True
+            )
+        )
 
     def _check_for_ambiguous_file_types(self):
         """Check if there are ambiguous file types and prompt for input if necessary."""
@@ -315,17 +305,28 @@ class DirectoryConversionManager(BaseConversionManager):
         return False
 
     def _set_input_extension_and_file_list(self):
-        """Set the input extension and update the flags."""
+        """Set input extension and file list. Also updates flags."""
         self.input_ext = list(self.extension_counts.keys())[0]
-        self.file_list = self.file_groups[self.input_ext]
+        self.settins.input_output_flags.set_flags("auto", self.input_ext, None)
+        self.conversion_file_list = self.extension_file_groups[self.input_ext]
 
-    def _auto_detect_majority_extension(self):
+    def _detect_majority_extension(self):
         """determine the majority file extension in the directory."""
         # Check for ambiguity: if more than one alias has the top count, ask the user to specify.
         self._sort_extensions_by_count()
         if not self._check_for_ambiguous_file_types():
             self._set_input_extension_and_file_list()
-            self.settings.input_output_flags.set_flags("auto", self.input_ext, None)
+
+    def _start_conversion_process(self):
+        """Starts the conversion process by adding file paths to the import queue"""
+        if self._import_and_export_queues_empty():
+            if self.output_ext is None:
+                self._place_file_paths_in_queue()
+
+    def _place_file_paths_in_queue(self):
+        """Gets path of each file in self.conversion_file_list and places in queue"""
+        for file_info in self.conversion_file_list:
+            self.import_queue.put(file_info["path"])
 
 
 # TODO: (13-Feb-2025) Implement below when needed. DO NOT DELETE.

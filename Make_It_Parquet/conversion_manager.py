@@ -37,23 +37,17 @@ class BaseConversionManager:
     """
     Base class for file and directory conversion managers.
 
-    Provides common functionality for managing file conversions including:
-     management for imports/exports
-    - Input/output format validation
-    - Import/export class generation
-
     Attributes:
-        ALLOWED_FILE_EXTENSIONS (set): Set of allowed file extensions (.csv, .json, etc)
-        settings (Settings): Settings object containing CLI arguments and config
-        logger (Logger): Logger instance for this manager
-        input_path (Path): Path to input file/directory
-        input_ext (str): Input file extension/format
-        output_ext (str): Output file extension/format
-        import_queue (Queue): Queue for files to be imported
-        export_queue (Queue): Queue for files to be exported
-        import_class (BaseInputConnection): Class instance for handling imports
-        export_class (BaseOutputConnection): Class instance for handling exports
-        file_or_dir (str): Whether input path is a 'file' or 'dir'
+        settings: Settings instance
+        file_info_dict: Dictionary containing file information
+        input_path: Path to the input file or directory
+        input_ext: Extension of the input file
+        output_ext: Extension of the output file
+        file_or_dir: Whether the input is a file or directory
+        import_queue: Queue for importing files
+        export_queue: Queue for exporting files
+        import_queue_status_flag: Flag indicating whether the import queue is empty
+        export_queue_status_flag: Flag indicating whether the export queue is empty
     """
 
     def __init__(self, mp: "MakeItParquet"):
@@ -97,11 +91,10 @@ class BaseConversionManager:
         Raises:
             ValueError: If input extension is not supported
         """
-
         if not self.input_ext == ".xlsx":
-            self._return_standard_import_class
+            self._return_standard_import_class()
         else:
-            self._return_excel_import_class
+            self._return_excel_import_class()
 
     def _return_standard_import_class(self):
         """Returns a non-excel import class."""
@@ -335,39 +328,78 @@ class DirectoryConversionManager(BaseConversionManager):
 # TODO: (13-Feb-2025) Implement below when needed. DO NOT DELETE.
 
 
-# def _replace_alias_in_string(self) -> str:
-#     pattern = re.compile(re.escape(self.input_ext), re.IGNORECASE)
-#
-#
-# def replacer(match: re.Match) -> str:
-#     orig = match.group()
-#     if orig.isupper():
-#         return self.input_ext.upper()
-#     elif orig.islower():
-#         return self.input_ext.lower()
-#     elif orig[0].isupper() and orig[1:].islower():
-#         return self.input_ext.capitalize()
-#     else:
-#         return self.input_ext
-#
-#     result, count = pattern.subn(replacer, self.input_ext)
-#     if count == 0:
-#         result = f"{self.input_ext}"
-#     return result
-#
-#
-# def _generate_output_name(self) -> str:
-#     if self.input_ext and self.input_ext.lower() in self.input_path.name.lower():
-#         return self._replace_alias_in_string()
-#     else:
-#         return f"{self.input_path.name}_{self.output_ext}"
-#
-#
-# def generate_output_path(input_path: Path, output_ext: str) -> Path:
-#     return input_path.with_suffix(f".{output_ext}")
-#
-#
-# def get_conversion_params(
-#     input_path: Path, input_ext: str
-# ) -> Tuple[List[Path], None, str]:
-#     return ([input_path], None, input_ext.lstrip("."))
+# def replacer(match: re.Match) -> str: TODO: find out where this originally went.
+def replacer(input_ext: str, match: re.Match) -> str:
+    """
+    Replace the matched string in the input extension with the correct case.
+
+    Args:
+    match: re.Match
+        The matched string.
+
+    Returns:
+    str:
+        The matched string with the correct case.
+    """
+    orig = match.group()
+    if orig.isupper():
+        return input_ext.upper()
+    elif orig.islower():
+        return input_ext.lower()
+    elif orig[0].isupper() and orig[1:].islower():
+        return input_ext.capitalize()
+    else:
+        return input_ext
+
+
+def replace_alias_in_string(self) -> str:
+    """
+    Replace the matched string in the input extension with the correct case.
+
+    This method takes in the input extension and returns the same extension
+    with the correct case. If the extension is not found in the string, the
+    original string is returned.
+
+    Args:
+        self (str): The input extension.
+
+    Returns:
+        str: The matched string with the correct case.
+    """
+    pattern = re.compile(re.escape(self.input_ext), re.IGNORECASE)
+    result, count = pattern.subn(replacer, self.input_ext)
+    if count == 0:
+        result = f"{self.input_ext}"
+    return result
+
+
+def generate_output_name(self) -> str:
+    """
+    Generate a name for the output file.
+
+    If the input extension is present in the input file name (case-insensitive),
+    the output name is generated by replacing the input extension with the
+    correct case. Otherwise, the output name is generated by appending the
+    output extension to the input file name.
+
+    Returns:
+        str: The generated output name.
+    """
+    if self.input_ext and self.input_ext.lower() in self.input_path.name.lower():
+        return self._replace_alias_in_string()
+    else:
+        return f"{self.input_path.name}_{self.output_ext}"
+
+
+def generate_output_path(input_path: Path, output_ext: str) -> Path:
+    """
+    Generate a path for the output file.
+
+    Args:
+        input_path (Path): The path to the input file.
+        output_ext (str): The output file extension.
+
+    Returns:
+        Path: The path to the output file.
+    """
+    return input_path.with_suffix(f".{output_ext}")

@@ -30,7 +30,7 @@ from file_information import create_file_info_dict_from_scandir
 from user_interface.interactive import prompt_for_input_format, prompt_for_output_format
 
 if TYPE_CHECKING:
-    from make_it_parquet import MakeItParquet
+    from main import MakeItParquet
 
 
 class BaseFileManager:
@@ -68,7 +68,7 @@ class BaseFileManager:
         self.output_ext: Optional[str] = self.settings.output_ext
 
         # File or directory.
-        self.file_or_dir: str = self.settings.file_or_dir
+        self.file_or_dir: str = self.settings.file_info_dict["file_or_directory"]
 
         # Initialize queues for import/export.
         self.import_queue = queue.Queue()

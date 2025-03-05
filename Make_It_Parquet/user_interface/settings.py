@@ -9,7 +9,6 @@ Additionally, the InputOutputFlags class is used to manage flags related to how 
 from typing import Optional
 from ..file_information import (
     create_file_info_dict_from_path,
-    determine_file_or_dir,
 )
 import argparse
 from .cli_parser import get_input_output_extensions
@@ -39,7 +38,6 @@ class Settings:
 
         # File information.
         self.file_info_dict = create_file_info_dict_from_path(self.args.path)
-        self.file_or_dir = determine_file_or_dir(self.file_info_dict["path"])
         # Initialise attributes for additional settings.
         self.excel_settings = None
         self.txt_settings = None

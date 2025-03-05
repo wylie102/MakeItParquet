@@ -1,3 +1,4 @@
+# TODO: update to generate new files and larger file dictionary.
 import json
 import os
 import duckdb
@@ -53,6 +54,7 @@ def create_sample_files():
     return file_paths
 
 
+# TODO: update file dictionary.
 def generate_golden_info(file_paths):
     info = {}
     for file_type, path in file_paths.items():

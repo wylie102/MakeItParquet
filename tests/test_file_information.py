@@ -4,11 +4,8 @@ import pytest
 from pathlib import Path
 from Make_It_Parquet.file_information import (
     resolve_path,
-    determine_file_or_dir,
-    generate_file_stat,
-    file_size,
-    file_name,
-    file_extension,
+    file_or_dir_from_stat,
+    get_file_stat,
     create_file_info_dict,
 )
 
@@ -70,56 +67,37 @@ def sample_files():
     return file_paths
 
 
-# Parameterize tests by file type.
+# Parameterize tests by file type. TODO:update for new method
 @pytest.mark.parametrize("file_type", list(GOLDEN_INFO.keys()))
 def test_resolve_path(sample_files, file_type):
     file_path = sample_files[file_type]
     assert resolve_path(file_path) == file_path
 
 
+# TODO: create test for os.DirEntry input
 @pytest.mark.parametrize("file_type", list(GOLDEN_INFO.keys()))
-def test_generate_file_stat(sample_files, file_type):
-    file_path = sample_files[file_type]
+def test_get_file_stat(sample_files, file_type):
+    file_path = sample_files[file_type].resolve()
     expected = GOLDEN_INFO[file_type]
-    stat_obj = generate_file_stat(file_path)
+    stat_obj = get_file_stat(file_path, file_path)
     assert stat_obj.st_size == expected["file_size"]
 
 
 @pytest.mark.parametrize("file_type", list(GOLDEN_INFO.keys()))
-def test_file_or_dir(sample_files, file_type):
+def test_file_or_dir_from_stat(sample_files, file_type):
     file_path = sample_files[file_type]
-    assert determine_file_or_dir(file_path) == "file"
+    stat_obj = file_path.os.stat
+    assert file_or_dir_from_stat(stat_obj) == "file"
 
 
-@pytest.mark.parametrize("file_type", list(GOLDEN_INFO.keys()))
-def test_file_size(sample_files, file_type):
-    file_path = sample_files[file_type]
-    expected = GOLDEN_INFO[file_type]
-    stat_obj = generate_file_stat(file_path)
-    assert file_size(stat_obj) == expected["file_size"]
-
-
-@pytest.mark.parametrize("file_type", list(GOLDEN_INFO.keys()))
-def test_file_name(sample_files, file_type):
-    file_path = sample_files[file_type]
-    expected = GOLDEN_INFO[file_type]
-    assert file_name(file_path) == expected["file_name"]
-
-
-@pytest.mark.parametrize("file_type", list(GOLDEN_INFO.keys()))
-def test_file_extension(sample_files, file_type):
-    file_path = sample_files[file_type]
-    expected = GOLDEN_INFO[file_type]
-    assert file_extension(file_path) == expected["file_extension"]
-
-
+# TODO: update to account for larger file dictionary.
 @pytest.mark.parametrize("file_type", list(GOLDEN_INFO.keys()))
 def test_create_file_info_dict(sample_files, file_type):
     file_path = sample_files[file_type]
     expected = GOLDEN_INFO[file_type]
     info = create_file_info_dict(file_path)
     # Normalize the path to a string for comparison.
-    info["path"] = str(info["path"])
+    assert info["path"] == expected["path"]
     assert info["file_size"] == expected["file_size"]
     assert info["file_name"] == expected["file_name"]
     assert info["file_extension"] == expected["file_extension"]

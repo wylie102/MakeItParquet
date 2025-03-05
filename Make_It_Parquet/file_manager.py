@@ -26,7 +26,7 @@ from extension_mapping import (
     ALLOWED_FILE_EXTENSIONS,
     import_class_map,
 )
-from file_information import create_file_info_dict_from_scandir
+from file_information import create_file_info_dict
 from user_interface.interactive import prompt_for_input_format, prompt_for_output_format
 
 if TYPE_CHECKING:
@@ -64,7 +64,7 @@ class BaseFileManager:
 
         # Store parsed CLI arguments by copying from Settings.
         self.input_path: Path = self.file_info_dict["path"]
-        self.input_ext: Optional[str] = self.mp.settings.input_ext
+        self.input_ext: Optional[str] = self.settings.input_ext
         self.output_ext: Optional[str] = self.settings.output_ext
 
         # File or directory.
@@ -255,7 +255,7 @@ class DirectoryManager(BaseFileManager):
         with os.scandir(self.input_path) as entries:
             for entry in entries:
                 if entry.is_file():
-                    file_info = create_file_info_dict_from_scandir(entry)
+                    file_info = create_file_info_dict(entry)
                     self.dir_file_list.append(file_info)
 
     def _group_files_by_extension(self):

@@ -8,7 +8,7 @@ Additionally, the InputOutputFlags class is used to manage flags related to how 
 
 from typing import Optional
 from ..file_information import (
-    create_file_info_dict_from_path,
+    create_file_info_dict,
 )
 import argparse
 from .cli_parser import get_input_output_extensions
@@ -37,7 +37,7 @@ class Settings:
         )
 
         # File information.
-        self.file_info_dict = create_file_info_dict_from_path(self.args.path)
+        self.file_info_dict = create_file_info_dict(self.args.path)
         # Initialise attributes for additional settings.
         self.excel_settings = None
         self.txt_settings = None

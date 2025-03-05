@@ -10,7 +10,7 @@ Make-it-Parquet!: A data file conversion tool powered by DuckDB.
 
 from typing import Optional, Union
 from user_interface.settings import Settings
-from conversion_manager import FileConversionManager, DirectoryConversionManager
+from file_manager import FileManager, DirectoryManager
 from user_interface.cli_parser import parse_cli_arguments
 
 
@@ -29,7 +29,7 @@ class MakeItParquet:
 
     def _create_conversion_manager(
         self,
-    ) -> Union[FileConversionManager, DirectoryConversionManager]:
+    ) -> Union[FileManager, DirectoryManager]:
         """
         Factory function to create a conversion manager based on the input path.
 
@@ -40,12 +40,12 @@ class MakeItParquet:
             settings (Settings): The application settings and configuration.
 
         Returns:
-            FileConversionManager or DirectoryConversionManager: Instance corresponding to the target type.
+            FileManager or DirectoryManager: Instance corresponding to the target type.
         """
         if self.settings.file_or_dir == "file":
-            return FileConversionManager(self)
+            return FileManager(self)
         else:
-            return DirectoryConversionManager(self)
+            return DirectoryManager(self)
 
     def exit_program(self, message: str, error_type: Optional[str] = "error") -> None:
         """

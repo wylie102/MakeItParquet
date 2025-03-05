@@ -33,7 +33,7 @@ if TYPE_CHECKING:
     from make_it_parquet import MakeItParquet
 
 
-class BaseConversionManager:
+class BaseFileManager:
     """
     Base class for file and directory conversion managers.
 
@@ -168,7 +168,7 @@ class BaseConversionManager:
         raise ValueError(f"Unsupported output extension: {self.output_ext}")
 
 
-class FileConversionManager(BaseConversionManager):
+class FileManager(BaseFileManager):
     """
     Manager for single file conversions.
 
@@ -218,7 +218,7 @@ class FileConversionManager(BaseConversionManager):
         pass  # TODO: 26/02/2025 implement this method.
 
 
-class DirectoryConversionManager(BaseConversionManager):
+class DirectoryManager(BaseFileManager):
     """
     Manager for directory conversions.
 

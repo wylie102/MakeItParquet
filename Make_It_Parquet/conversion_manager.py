@@ -7,6 +7,12 @@ import os
 import uuid
 import duckdb
 from user_interface.settings import Settings
+from user_interface.interactive import prompt_for_output_format
+import converters as conv
+from extension_mapping import (
+    ALIAS_TO_EXTENSION_MAP,
+    import_class_map,
+)
 
 
 class ConversionManager:
@@ -32,8 +38,9 @@ class ConversionManager:
         self,
         db_path: str,
         conversion_file_list: List[Dict[str, Any]],
+        input_ext: str,
+        settings: Settings,
         output_ext: Optional[str] = None,
-        settings: Optional[Settings] = None,
     ) -> None:
         """Initializes the conversion manager.
 
@@ -45,6 +52,7 @@ class ConversionManager:
         """
         self.db_path = db_path
         self.conn = duckdb.connect(db_path)  # Persistent, file-based connection
+        self.input_ext = input_ext
         self.output_ext = output_ext
         self.settings = settings
         self.import_queue: Queue[str] = Queue()
@@ -63,6 +71,71 @@ class ConversionManager:
         """
         for file_info in conversion_file_list:
             self.import_queue.put(file_info["path"])
+
+    def _return_standard_import_class(self):
+        """Returns a non-excel import class."""
+        if self.input_ext:
+            return import_class_map[self.input_ext]
+
+    def _return_excel_import_class(self):
+        """Returns an excel import class."""
+        # TODO: 21-Feb-2025: Write excel_utils.py functions/methods to load excel extension.
+        pass  # TODO: 21-Feb-2025: Refactor excel_utils.py
+
+    def _generate_import_class(self):
+        """
+        Create appropriate input class based on file extension.
+
+        Determines and instantiates the correct input class based on the input
+        file extension. Handles special cases for Excel files based on output format.
+
+        Returns:
+            BaseInputConnection: Instance of appropriate input class for the file type
+
+        Raises:
+            ValueError: If input extension is not supported
+        """
+        if not self.input_ext == ".xlsx":
+            self._return_standard_import_class()
+        else:
+            self._return_excel_import_class()
+
+    def _determine_output_extension(self):
+        """
+        Set the output file extension.
+
+        If output extension is not already set in settings, prompts user to select
+        one. Validates that output format differs from input format.
+        """
+        if not self.output_ext:
+            prompt_for_output_format(self.settings, ALIAS_TO_EXTENSION_MAP)
+
+    def _generate_export_class(self):
+        """
+        Create appropriate output class based on output format.
+
+        Determines and instantiates the correct output class based on the desired
+        output format.
+
+        Returns:
+            BaseOutputConnection: Instance of appropriate output class for the format
+
+        Raises:
+            ValueError: If output format is not supported
+        """
+        export_class_map = {
+            "csv": conv.CSVOutput,
+            "tsv": conv.TsvOutput,
+            "txt": conv.TxtOutput,
+            "json": conv.JSONOutput,
+            "parquet": conv.ParquetOutput,
+            "excel": conv.ExcelOutput,
+        }
+
+        if self.output_ext in export_class_map:
+            return export_class_map[self.output_ext]()
+
+        raise ValueError(f"Unsupported output extension: {self.output_ext}")
 
     def _generate_table_name(self, file_path: str) -> str:
         """Generates a unique table name for the imported file.
@@ -89,9 +162,7 @@ class ConversionManager:
             duckdb.Error: If the import operation fails
         """
         table_name = self._generate_table_name(file_path)
-        import_sql = (
-            f"CREATE TABLE {table_name} AS SELECT * FROM read_csv_auto('{file_path}')"
-        )
+        import_sql = f"CREATE TABLE {table_name} AS SELECT * FROM read_csv_auto('{file_path}')"  # TODO: this needs to call correct import class for the file ext.
         self.conn.execute(import_sql)
         return table_name
 
@@ -109,10 +180,10 @@ class ConversionManager:
         output_dir = os.path.dirname(file_path)
         output_file = os.path.join(output_dir, f"{base}.{self.output_ext}")
 
-        export_sql = (
-            f"COPY {table_name} TO '{output_file}' (FORMAT '{self.output_ext}')"
-        )
-        self.conn.execute(export_sql)
+        export_sql = f"COPY {table_name} TO '{output_file}' (FORMAT '{self.output_ext}')"  # TODO: may also need to do use output class here, although with moving to using persistent db and copy it may not be necessary.
+        self.conn.execute(
+            export_sql
+        )  # TODO: may need a check here to ensure successful export before dropping tables.
         self.conn.execute(f"DROP TABLE {table_name}")
 
         self._log_success(file_path, output_file)
@@ -124,7 +195,9 @@ class ConversionManager:
             input_file: Path to the original input file
             output_file: Path to the newly created output file
         """
-        if self.settings and hasattr(self.settings, "logger"):
+        if (
+            self.settings and hasattr(self.settings, "logger")
+        ):  # TODO: check whether these checks for existance of settings and logger are redundant or not.
             self.settings.logger.info(
                 f"File {input_file} successfully converted to {output_file}"
             )
@@ -163,7 +236,9 @@ class ConversionManager:
             self._export_file(pending["file_path"], pending["table_name"])
         self.pending_exports.clear()
 
-    def set_output_extension(self, output_ext: str) -> None:
+    def set_output_extension(
+        self, output_ext: str
+    ) -> None:  # TODO: in main file manager check whether it is worth using this or setting it directly.
         """Sets the output file extension for exports.
 
         Args:

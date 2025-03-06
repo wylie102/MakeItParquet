@@ -14,20 +14,13 @@ The managers handle:
 """
 
 import os
-import queue
 import re
 from collections import defaultdict
 from pathlib import Path
 from typing import TYPE_CHECKING, Dict, List, Optional, Union
-
-import converters as conv
-from extension_mapping import (
-    ALIAS_TO_EXTENSION_MAP,
-    ALLOWED_FILE_EXTENSIONS,
-    import_class_map,
-)
+from extension_mapping import ALLOWED_FILE_EXTENSIONS, ALIAS_TO_EXTENSION_MAP
 from file_information import create_file_info_dict
-from user_interface.interactive import prompt_for_input_format, prompt_for_output_format
+from user_interface.interactive import prompt_for_input_format
 
 if TYPE_CHECKING:
     from main import MakeItParquet
@@ -67,106 +60,6 @@ class BaseFileManager:
         self.input_ext: Optional[str] = self.settings.input_ext
         self.output_ext: Optional[str] = self.settings.output_ext
 
-        # File or directory.
-        self.file_or_dir: str = self.settings.file_info_dict["file_or_directory"]
-
-        # Initialize queues for import/export.
-        self.import_queue = queue.Queue()
-        self.export_queue = queue.Queue()
-
-        # initialize flags for import/export queues.
-        self.import_queue_status_flag_flag = 0  # zero = empty
-        self.export_queue_status_flag = 0  # zero = empty
-
-    def _generate_import_class(self):
-        """
-        Create appropriate input class based on file extension.
-
-        Determines and instantiates the correct input class based on the input
-        file extension. Handles special cases for Excel files based on output format.
-
-        Returns:
-            BaseInputConnection: Instance of appropriate input class for the file type
-
-        Raises:
-            ValueError: If input extension is not supported
-        """
-        if not self.input_ext == ".xlsx":
-            self._return_standard_import_class()
-        else:
-            self._return_excel_import_class()
-
-    def _return_standard_import_class(self):
-        """Returns a non-excel import class."""
-        if self.input_ext:
-            return import_class_map[self.input_ext]
-
-    def _return_excel_import_class(self):
-        """Returns an excel import class."""
-        # TODO: 21-Feb-2025: Write excel_utils.py functions/methods to load excel extension.
-        pass  # TODO: 21-Feb-2025: Refactor excel_utils.py
-
-    def _update_import_queue_status_flag(self):
-        """Checks import queue, if empty, sets flag to 0, else sets flag to 1."""
-        if self.import_queue.empty():
-            self.import_queue_status_flag = 0
-        else:
-            self.import_queue_status_flag = 1
-
-    def _update_export_queue_status_flag(self):
-        """Checks export queue, if empty, sets flag to 0, else sets flag to 1."""
-        if self.export_queue.empty():
-            self.export_queue_status_flag = 0
-        else:
-            self.export_queue_status_flag = 1
-
-    def _import_and_export_queues_empty(self):
-        """Returns True if both import and export queues are empty, else returns false."""
-        if (
-            self.import_queue_status_flag_flag == 0
-            and self.export_queue_status_flag == 0
-        ):
-            return True
-        else:
-            return False
-
-    def _determine_output_extension(self):
-        """
-        Set the output file extension.
-
-        If output extension is not already set in settings, prompts user to select
-        one. Validates that output format differs from input format.
-        """
-        if not self.output_ext:
-            prompt_for_output_format(self.settings, ALIAS_TO_EXTENSION_MAP)
-
-    def _generate_export_class(self):
-        """
-        Create appropriate output class based on output format.
-
-        Determines and instantiates the correct output class based on the desired
-        output format.
-
-        Returns:
-            BaseOutputConnection: Instance of appropriate output class for the format
-
-        Raises:
-            ValueError: If output format is not supported
-        """
-        export_class_map = {
-            "csv": conv.CSVOutput,
-            "tsv": conv.TsvOutput,
-            "txt": conv.TxtOutput,
-            "json": conv.JSONOutput,
-            "parquet": conv.ParquetOutput,
-            "excel": conv.ExcelOutput,
-        }
-
-        if self.output_ext in export_class_map:
-            return export_class_map[self.output_ext]()
-
-        raise ValueError(f"Unsupported output extension: {self.output_ext}")
-
 
 class FileManager(BaseFileManager):
     """
@@ -183,14 +76,6 @@ class FileManager(BaseFileManager):
 
         # Check input extension and generate import class.
         self._check_input_extension()
-        self.import_class = self._generate_import_class()
-        self._start_conversion_process()
-
-        # Determine the output extension.
-        self._determine_output_extension()
-
-        # Generate the export class.
-        self.export_class = self._generate_export_class()
 
     def _check_input_extension(self):
         """
@@ -312,17 +197,6 @@ class DirectoryManager(BaseFileManager):
         self._sort_extensions_by_count()
         if not self._check_for_ambiguous_file_types():
             self._set_input_extension_and_file_list()
-
-    def _start_conversion_process(self):
-        """Starts the conversion process by adding file paths to the import queue"""
-        if self._import_and_export_queues_empty():
-            if self.output_ext is None:
-                self._place_file_paths_in_queue()
-
-    def _place_file_paths_in_queue(self):
-        """Gets path of each file in self.conversion_file_list and places in queue"""
-        for file_info in self.conversion_file_list:
-            self.import_queue.put(file_info["path"])
 
 
 # TODO: (13-Feb-2025) Implement below when needed. DO NOT DELETE.

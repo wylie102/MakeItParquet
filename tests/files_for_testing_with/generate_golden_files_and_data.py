@@ -1,75 +1,156 @@
-# TODO: update to generate new files and larger file dictionary.
 import json
 import os
-import duckdb
+import sys
 from pathlib import Path
+from typing import Dict, Any
+
+import duckdb
+
 
 # Define a permanent directory for the sample files.
-SAMPLE_DIR = (
-    Path(
-        "/Users/wylie/Desktop/Projects/DuckConvert/tests/files_for_testing_with/generate_golden_files"
-    ).parent
-    / "sample_files"
-)
-SAMPLE_DIR.mkdir(exist_ok=True)
+BASE_DIR = Path(__file__).parent
+SAMPLE_DIR = BASE_DIR / "sample_files"
+GOLDEN_INFO_PATH = BASE_DIR / "golden_info.py"
 
 
-def create_sample_files():
-    """Creates permanent test files in various formats using a single DuckDB connection."""
-    file_paths = {
+def ensure_sample_directory() -> None:
+    """Creates the sample directory if it doesn't exist."""
+    SAMPLE_DIR.mkdir(exist_ok=True)
+
+
+def get_file_paths() -> Dict[str, Path]:
+    """Returns a dictionary mapping file types to their paths."""
+    return {
         "txt": SAMPLE_DIR / "sample.txt",
         "csv": SAMPLE_DIR / "sample.csv",
         "tsv": SAMPLE_DIR / "sample.tsv",
         "parquet": SAMPLE_DIR / "sample.parquet",
         "json": SAMPLE_DIR / "sample.json",
         "xlsx": SAMPLE_DIR / "sample.xlsx",
+        "directory": SAMPLE_DIR,  # Include a directory for testing
     }
 
-    # Define dataset queries.
-    small_query = "SELECT 1 AS id, 'Alice' AS name UNION ALL SELECT 2, 'Bob'"
-    small_data = duckdb.sql(small_query)
-    medium_data = duckdb.sql(
-        "SELECT range AS id, 'Person_' || range AS name FROM range(100)"
-    )
-    large_data = duckdb.sql(
-        "SELECT range AS id, 'Person_' || range AS name, range * 10 AS value FROM range(10000)"
+
+def create_small_dataset() -> duckdb.DuckDBPyRelation:
+    """Creates a small dataset for testing."""
+    query = "SELECT 1 AS id, 'Alice' AS name UNION ALL SELECT 2, 'Bob'"
+    return duckdb.sql(query)
+
+
+def create_medium_dataset() -> duckdb.DuckDBPyRelation:
+    """Creates a medium-sized dataset for testing."""
+    return duckdb.sql("SELECT range AS id, 'Person_' || range AS name FROM range(100)")
+
+
+def create_large_dataset() -> duckdb.DuckDBPyRelation:
+    """Creates a large dataset for testing."""
+    return duckdb.sql(
+        "SELECT range AS id, 'Person_' || range AS name, "
+        "range * 10 AS value FROM range(10000)"
     )
 
-    # Use the relation API to write files with converted file paths.
+
+def write_standard_files(file_paths: Dict[str, Path]) -> None:
+    """Writes datasets to standard file formats."""
+    small_data = create_small_dataset()
+    medium_data = create_medium_dataset()
+    large_data = create_large_dataset()
+
     small_data.write_csv(str(file_paths["csv"]), header=True)
     medium_data.write_csv(str(file_paths["tsv"]), header=True, sep="\t")
     large_data.write_csv(str(file_paths["txt"]), header=False, sep="\t")
     large_data.write_parquet(str(file_paths["parquet"]))
 
-    # For JSON and Excel output, install & load the Excel extension.
-    with duckdb.connect(database=":memory:") as con:
-        con.install_extension("excel")
-        con.load_extension("excel")
-        con.execute(
+
+def write_extension_files(file_paths: Dict[str, Path]) -> None:
+    """Writes datasets using DuckDB extensions."""
+    small_query = "SELECT 1 AS id, 'Alice' AS name UNION ALL SELECT 2, 'Bob'"
+
+    with duckdb.connect(database=":memory:") as conn:
+        conn.install_extension("excel")
+        conn.load_extension("excel")
+        conn.execute(
             f"COPY ({small_query}) TO '{str(file_paths['json'])}' (FORMAT JSON)"
         )
-        con.execute(
+        conn.execute(
             f"COPY ({small_query}) TO '{str(file_paths['xlsx'])}' (FORMAT XLSX)"
         )
+
+
+def create_sample_files() -> Dict[str, Path]:
+    """Creates all sample files needed for testing."""
+    ensure_sample_directory()
+    file_paths = get_file_paths()
+
+    write_standard_files(file_paths)
+    write_extension_files(file_paths)
+
     return file_paths
 
 
-# TODO: update file dictionary.
-def generate_golden_info(file_paths):
+def generate_file_info(file_paths: Dict[str, Path]) -> Dict[str, Dict[str, Any]]:
+    """Generates info dictionaries for each file matching create_file_info_dict structure."""
     info = {}
     for file_type, path in file_paths.items():
         stat = os.stat(path)
+        file_or_dir = "directory" if path.is_dir() else "file"
+
         info[file_type] = {
-            "file_size": stat.st_size,
+            "path": str(path),
+            "stat_obj": stat,
             "file_name": path.name,
+            "file_size": stat.st_size,
             "file_extension": path.suffix,
-            "is_file": path.is_file(),
+            "file_or_directory": file_or_dir,
         }
     return info
 
 
+def write_golden_info(info: Dict[str, Dict[str, Any]]) -> None:
+    """Writes the golden info to a Python file."""
+    with open(GOLDEN_INFO_PATH, "w") as f:
+        f.write("#!/usr/bin/env python3\n")
+        f.write('"""Generated golden info for testing.\n\n')
+        f.write("This file is auto-generated by generate_golden_files_and_data.py.\n")
+        f.write('"""\n\n')
+        f.write("GOLDEN_INFO = ")
+
+        # Convert stat objects to dictionaries for serialization
+        serializable_info = {}
+        for file_type, file_info in info.items():
+            stat_obj = file_info["stat_obj"]
+            stat_dict = {
+                "st_mode": stat_obj.st_mode,
+                "st_ino": stat_obj.st_ino,
+                "st_dev": stat_obj.st_dev,
+                "st_nlink": stat_obj.st_nlink,
+                "st_uid": stat_obj.st_uid,
+                "st_gid": stat_obj.st_gid,
+                "st_size": stat_obj.st_size,
+                "st_atime": stat_obj.st_atime,
+                "st_mtime": stat_obj.st_mtime,
+                "st_ctime": stat_obj.st_ctime,
+            }
+
+            serializable_info[file_type] = file_info.copy()
+            serializable_info[file_type]["stat_obj"] = stat_dict
+
+        f.write(json.dumps(serializable_info, indent=2).replace("null", "None"))
+        f.write("\n")
+
+
+def main() -> None:
+    """Main function to generate sample files and golden info."""
+    try:
+        files = create_sample_files()
+        golden_info = generate_file_info(files)
+        write_golden_info(golden_info)
+        print(f"Generated sample files in {SAMPLE_DIR}")
+        print(f"Generated golden info at {GOLDEN_INFO_PATH}")
+    except Exception as e:
+        print(f"Error generating files: {e}", file=sys.stderr)
+        sys.exit(1)
+
+
 if __name__ == "__main__":
-    files = create_sample_files()
-    golden_info = generate_golden_info(files)
-    # Pretty-print the golden dictionary to the console.
-    print(json.dumps(golden_info, indent=2))
+    main()

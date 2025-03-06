@@ -1,4 +1,4 @@
-#! /usr/bin/env python3
+#!/usr/bin/env python3
 
 import pytest
 from pathlib import Path
@@ -9,95 +9,55 @@ from Make_It_Parquet.file_information import (
     create_file_info_dict,
 )
 
-# Hard-coded golden info dictionary.
-GOLDEN_INFO = {
-    "txt": {
-        "file_size": 226669,
-        "file_name": "sample.txt",
-        "file_extension": ".txt",
-        "is_file": True,
-    },
-    "csv": {
-        "file_size": 22,
-        "file_name": "sample.csv",
-        "file_extension": ".csv",
-        "is_file": True,
-    },
-    "tsv": {
-        "file_size": 1288,
-        "file_name": "sample.tsv",
-        "file_extension": ".tsv",
-        "is_file": True,
-    },
-    "parquet": {
-        "file_size": 132101,
-        "file_name": "sample.parquet",
-        "file_extension": ".parquet",
-        "is_file": True,
-    },
-    "json": {
-        "file_size": 46,
-        "file_name": "sample.json",
-        "file_extension": ".json",
-        "is_file": True,
-    },
-    "xlsx": {
-        "file_size": 4099,
-        "file_name": "sample.xlsx",
-        "file_extension": ".xlsx",
-        "is_file": True,
-    },
-}
+# Import the generated golden info
+from tests.files_for_testing_with.golden_info import GOLDEN_INFO
 
 
-# Fixture to load the golden sample files from the fixed directory.
+# Fixture to load the sample files from the fixed directory
 @pytest.fixture(scope="session")
 def sample_files():
-    base_dir = Path(
-        "/Users/wylie/Desktop/Projects/MakeItParquet/tests/files_for_testing_with/sample_files"
-    )
-    file_paths = {
-        "txt": base_dir / "sample.txt",
-        "csv": base_dir / "sample.csv",
-        "tsv": base_dir / "sample.tsv",
-        "parquet": base_dir / "sample.parquet",
-        "json": base_dir / "sample.json",
-        "xlsx": base_dir / "sample.xlsx",
-    }
+    file_paths = {}
+    for file_type, info in GOLDEN_INFO.items():
+        file_paths[file_type] = Path(info["path"])
     return file_paths
 
 
-# Parameterize tests by file type. TODO:update for new method
 @pytest.mark.parametrize("file_type", list(GOLDEN_INFO.keys()))
 def test_resolve_path(sample_files, file_type):
     file_path = sample_files[file_type]
-    assert resolve_path(file_path) == file_path
+    resolved = resolve_path(file_path)
+    assert str(resolved) == GOLDEN_INFO[file_type]["path"]
 
 
-# TODO: create test for os.DirEntry input
 @pytest.mark.parametrize("file_type", list(GOLDEN_INFO.keys()))
 def test_get_file_stat(sample_files, file_type):
-    file_path = sample_files[file_type].resolve()
-    expected = GOLDEN_INFO[file_type]
+    file_path = sample_files[file_type]
     stat_obj = get_file_stat(file_path, file_path)
-    assert stat_obj.st_size == expected["file_size"]
+    golden_stat = GOLDEN_INFO[file_type]["stat_obj"]
+
+    # Test key properties from the stat object
+    assert stat_obj.st_size == golden_stat["st_size"]
+    assert stat_obj.st_mode == golden_stat["st_mode"]
 
 
 @pytest.mark.parametrize("file_type", list(GOLDEN_INFO.keys()))
 def test_file_or_dir_from_stat(sample_files, file_type):
     file_path = sample_files[file_type]
-    stat_obj = file_path.os.stat
-    assert file_or_dir_from_stat(stat_obj) == "file"
+    stat_obj = file_path.stat()
+    expected_type = GOLDEN_INFO[file_type]["file_or_directory"]
+    assert file_or_dir_from_stat(stat_obj) == expected_type
 
 
-# TODO: update to account for larger file dictionary.
 @pytest.mark.parametrize("file_type", list(GOLDEN_INFO.keys()))
 def test_create_file_info_dict(sample_files, file_type):
     file_path = sample_files[file_type]
-    expected = GOLDEN_INFO[file_type]
+    golden_data = GOLDEN_INFO[file_type]
+
     info = create_file_info_dict(file_path)
-    # Normalize the path to a string for comparison.
-    assert info["path"] == expected["path"]
-    assert info["file_size"] == expected["file_size"]
-    assert info["file_name"] == expected["file_name"]
-    assert info["file_extension"] == expected["file_extension"]
+
+    # Test all important properties
+    assert str(info["path"]) == golden_data["path"]
+    assert info["file_size"] == golden_data["file_size"]
+    assert info["file_name"] == golden_data["file_name"]
+    assert info["file_extension"] == golden_data["file_extension"]
+    assert info["file_or_directory"] == golden_data["file_or_directory"]

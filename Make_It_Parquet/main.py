@@ -25,9 +25,9 @@ class MakeItParquet:
         """
         self.args = parse_cli_arguments()
         self.settings = Settings(self.args)
-        self.file_manager = self._create_conversion_manager()
+        self.file_manager = self._create_file_manager()
 
-    def _create_conversion_manager(
+    def _create_file_manager(
         self,
     ) -> Union[FileManager, DirectoryManager]:
         """

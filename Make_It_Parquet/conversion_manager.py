@@ -1,18 +1,19 @@
 #!/usr/bin/env python3
 """Manages the conversion of files to different formats using DuckDB."""
 
-from typing import List, Dict, Optional, Any
+from typing import List, Dict, Any, Union
 from queue import Queue
 import os
 import uuid
+import tempfile
 import duckdb
-from user_interface.settings import Settings
 from user_interface.interactive import prompt_for_output_format
 import converters as conv
 from extension_mapping import (
     ALIAS_TO_EXTENSION_MAP,
     import_class_map,
 )
+from file_manager import FileManager, DirectoryManager
 
 
 class ConversionManager:
@@ -34,32 +35,25 @@ class ConversionManager:
         one_in_one_out: Whether to export immediately after import
     """
 
-    def __init__(
-        self,
-        db_path: str,
-        conversion_file_list: List[Dict[str, Any]],
-        input_ext: str,
-        settings: Settings,
-        output_ext: Optional[str] = None,
-    ) -> None:
+    def __init__(self, file_manager: Union[FileManager, DirectoryManager]) -> None:
         """Initializes the conversion manager.
 
         Args:
-            db_path: Path to the DuckDB database file
-            conversion_file_list: List of file dictionaries to convert
-            output_ext: Optional output file extension
-            settings: Optional settings object
+            file_manager: BaseFileManager instance containing conversion settings
+                and file list information
         """
-        self.db_path = db_path
-        self.conn = duckdb.connect(db_path)  # Persistent, file-based connection
-        self.input_ext = input_ext
-        self.output_ext = output_ext
-        self.settings = settings
+        self.db_path = os.path.join(
+            tempfile.gettempdir(), f"make_it_parquet_{uuid.uuid4()}.db"
+        )
+        self.conn = duckdb.connect(self.db_path)
+        self.input_ext = file_manager.input_ext
+        self.output_ext = file_manager.output_ext
+        self.settings = file_manager.settings
         self.import_queue: Queue[str] = Queue()
         self.pending_exports: List[Dict[str, str]] = []
-        self.one_in_one_out: bool = output_ext is not None
+        self.one_in_one_out: bool = self.output_ext is not None
 
-        self._populate_import_queue(conversion_file_list)
+        self._populate_import_queue(file_manager.conversion_file_dict_list)
 
     def _populate_import_queue(
         self, conversion_file_list: List[Dict[str, Any]]

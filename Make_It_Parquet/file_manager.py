@@ -17,9 +17,9 @@ import os
 import re
 from collections import defaultdict
 from pathlib import Path
-from typing import TYPE_CHECKING, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Dict, List, Optional
 from extension_mapping import ALLOWED_FILE_EXTENSIONS, ALIAS_TO_EXTENSION_MAP
-from file_information import create_file_info_dict
+from file_information import FileInfoDict, create_file_info_dict
 from user_interface.interactive import prompt_for_input_format
 
 if TYPE_CHECKING:
@@ -74,8 +74,10 @@ class FileManager(BaseFileManager):
     def __init__(self, mp: "MakeItParquet"):
         super().__init__(mp)
 
-        # Check input extension and generate import class.
+        # Check input extension and generate conversion file list.
         self._check_input_extension()
+        self.conversion_file_dict_list: List[Dict[str, FileInfoDict]] = []
+        self._set_conversion_file_dict_list()
 
     def _check_input_extension(self):
         """
@@ -99,8 +101,11 @@ class FileManager(BaseFileManager):
                 f"Invalid file extension: {self.input_ext}. Allowed: {ALLOWED_FILE_EXTENSIONS}"
             )
 
-    def _start_conversion_process(self):
-        pass  # TODO: 26/02/2025 implement this method.
+    def _set_conversion_file_dict_list(self):
+        """sets conversion file dict list in same format as that used in directory manager."""
+        if self.input_ext:  # Ensure input_ext is not None
+            dict = {self.input_ext: self.file_info_dict}
+            self.conversion_file_dict_list.append(dict)
 
 
 class DirectoryManager(BaseFileManager):
@@ -120,20 +125,13 @@ class DirectoryManager(BaseFileManager):
         self.dir_file_list = []
         self.extension_file_groups = defaultdict(list)
         self.extension_counts = defaultdict(int)
-        self.conversion_file_list: List[Dict[str, Union[Path, str, int, str]]] = []
+        self.conversion_file_dict_list: List[Dict[str, FileInfoDict]] = []
+        self._set_conversion_file_dict_list()  # TODO: maybe make this more elegant, perhaps with a data class.
 
-        # creates and orders self.conversion_file_list.
+    def _set_conversion_file_dict_list(self):
         self._generate_extension_file_groups()  # creates dir_file_list, groups files into extension_file_groups, totals extension_counts.
         self._detect_majority_extension()  # detects majority extension, sets self.input_ext, sets conversion_file_list, updates flags.
         self._order_files_by_size()
-
-    def _order_files_by_size(self):
-        """
-        Sort the file dictionary by file size.
-
-        Orders files from smallest to largest to optimize processing.
-        """
-        self.conversion_file_list.sort(key=lambda x: x["file_size"], reverse=True)
 
     def _create_list_of_file_info_dicts(self):
         """Create a list of file information dictionaries from the directory."""
@@ -189,7 +187,7 @@ class DirectoryManager(BaseFileManager):
         """Set input extension and file list. Also updates flags."""
         self.input_ext = list(self.extension_counts.keys())[0]
         self.settings.input_output_flags.set_flags("auto", self.input_ext, None)
-        self.conversion_file_list = self.extension_file_groups[self.input_ext]
+        self.conversion_file_dict_list = self.extension_file_groups[self.input_ext]
 
     def _detect_majority_extension(self):
         """determine the majority file extension in the directory."""
@@ -197,6 +195,21 @@ class DirectoryManager(BaseFileManager):
         self._sort_extensions_by_count()
         if not self._check_for_ambiguous_file_types():
             self._set_input_extension_and_file_list()
+
+    def _order_files_by_size(self):
+        """
+        Sort the file dictionary by file size.
+
+            Orders files from smallest to largest to optimize processing.
+        """
+        if self.input_ext:
+            input_ext = self.input_ext
+            self.conversion_file_dict_list.sort(
+                key=lambda x: x[input_ext][
+                    "file_size"
+                ],  # Access file_size through the nested structure
+                reverse=True,
+            )
 
 
 # TODO: (13-Feb-2025) Implement below when needed. DO NOT DELETE.

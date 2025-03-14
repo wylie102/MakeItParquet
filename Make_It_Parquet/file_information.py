@@ -3,7 +3,7 @@
 from pathlib import Path
 import os
 import stat
-from typing import TypedDict, Union
+from typing import TypedDict
 
 
 class FileInfoDict(TypedDict):
@@ -15,16 +15,16 @@ class FileInfoDict(TypedDict):
     file_or_directory: str
 
 
-def resolve_path(input: Union[Path, os.DirEntry]) -> Path:
+def resolve_path(input: Path | os.DirEntry[str]) -> Path:
     """Resolves input path."""
     if isinstance(input, Path):
         return input.resolve()
-    elif isinstance(input, os.DirEntry):
-        return input.path.resolve()
+    else:
+        return Path(input.path).resolve()
 
 
 def get_file_stat(
-    input: Union[Path, os.DirEntry], resolved_path: Path
+    input: Path | os.DirEntry[str], resolved_path: Path
 ) -> os.stat_result:
     """Creates a file stat of the target file, which can be submitted as a path or an os.DirEntry object.
 
@@ -37,7 +37,7 @@ def get_file_stat(
     """
     if isinstance(input, Path):
         return resolved_path.stat()
-    elif isinstance(input, os.DirEntry):
+    else:
         return input.stat()
 
 
@@ -46,7 +46,7 @@ def file_or_dir_from_stat(stat_obj: os.stat_result) -> str:
     return "file" if stat.S_ISREG(stat_obj.st_mode) else "directory"
 
 
-def create_file_info_dict(input: Union[Path, os.DirEntry]) -> FileInfoDict:
+def create_file_info_dict(input: Path | os.DirEntry[str]) -> FileInfoDict:
     """Creates an info dictionary for the given input path."""
     path = resolve_path(input)
     stat_obj = get_file_stat(input, path)

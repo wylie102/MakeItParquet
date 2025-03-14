@@ -1,13 +1,12 @@
 #! /usr/bin/env python3
 
 import Make_It_Parquet.converters as conv
-from typing import Dict
 
 # Allowed file extensions.
 ALLOWED_FILE_EXTENSIONS = {".csv", "tsv", "txt", ".json", ".parquet", ".xlsx"}
 
 # Alias to extension map.
-ALIAS_TO_EXTENSION_MAP: Dict[str, str] = {
+ALIAS_TO_EXTENSION_MAP: dict[str, str] = {
     "csv": ".csv",
     "txt": ".txt",
     "tsv": ".tsv",
@@ -21,7 +20,7 @@ ALIAS_TO_EXTENSION_MAP: Dict[str, str] = {
 }
 
 # Reverse the alias to extension map.
-EXTENSION_TO_ALIAS_MAP: Dict[str, str] = {
+EXTENSION_TO_ALIAS_MAP: dict[str, str] = {
     v: k for k, v in ALIAS_TO_EXTENSION_MAP.items()
 }
 

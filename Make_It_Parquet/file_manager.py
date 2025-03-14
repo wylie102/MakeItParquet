@@ -17,13 +17,16 @@ import os
 import re
 from collections import defaultdict
 from pathlib import Path
-from typing import TYPE_CHECKING, Dict, List, Optional
-from extension_mapping import ALLOWED_FILE_EXTENSIONS, ALIAS_TO_EXTENSION_MAP
-from file_information import FileInfoDict, create_file_info_dict
-from user_interface.interactive import prompt_for_input_format
+from typing import TYPE_CHECKING
+
+from Make_It_Parquet.user_interface.settings import Settings
+
+from .extension_mapping import ALIAS_TO_EXTENSION_MAP, ALLOWED_FILE_EXTENSIONS
+from .file_information import FileInfoDict, create_file_info_dict
+from .user_interface.interactive import prompt_for_input_format
 
 if TYPE_CHECKING:
-    from main import MakeItParquet
+    from .main import MakeItParquet
 
 
 class BaseFileManager:
@@ -48,17 +51,17 @@ class BaseFileManager:
         Initialize the conversion manager.
         """
         # Attach MakeItParquet instance to the conversion manager.
-        self.mp = mp
+        self.mp: MakeItParquet = mp
         # Attach Settings instance to the conversion manager.
-        self.settings = mp.settings
+        self.settings: Settings = mp.settings
 
         # Store file information.
-        self.file_info_dict = self.settings.file_info_dict
+        self.file_info_dict: FileInfoDict = self.settings.file_info_dict
 
         # Store parsed CLI arguments by copying from Settings.
         self.input_path: Path = self.file_info_dict["path"]
-        self.input_ext: Optional[str] = self.settings.input_ext
-        self.output_ext: Optional[str] = self.settings.output_ext
+        self.input_ext: str | None = self.settings.input_ext
+        self.output_ext: str | None = self.settings.output_ext
 
 
 class FileManager(BaseFileManager):
@@ -76,7 +79,7 @@ class FileManager(BaseFileManager):
 
         # Check input extension and generate conversion file list.
         self._check_input_extension()
-        self.conversion_file_dict_list: List[Dict[str, FileInfoDict]] = []
+        self.conversion_file_dict_list: list[dict[str, FileInfoDict]] = []
         self._set_conversion_file_dict_list()
 
     def _check_input_extension(self):
@@ -92,7 +95,7 @@ class FileManager(BaseFileManager):
         """
         # Determine the input extension.
         if not self.input_ext:
-            self.input_ext = self.file_info_dict["file_extension"]
+            self.input_ext: str | None = self.file_info_dict["file_extension"]
 
         if (
             self.input_ext not in ALLOWED_FILE_EXTENSIONS
@@ -122,10 +125,10 @@ class DirectoryManager(BaseFileManager):
         super().__init__(mp)
 
         # initialize directory conversion attributes.
-        self.dir_file_list = []
-        self.extension_file_groups = defaultdict(list)
-        self.extension_counts = defaultdict(int)
-        self.conversion_file_dict_list: List[Dict[str, FileInfoDict]] = []
+        self.dir_file_list: list[FileInfoDict] = []
+        self.extension_file_groups: defaultdict[list] = defaultdict(list)
+        self.extension_counts: defaultdict[int] = defaultdict(int)
+        self.conversion_file_dict_list: list[dict[str, FileInfoDict]] = []
         self._set_conversion_file_dict_list()  # TODO: maybe make this more elegant, perhaps with a data class.
 
     def _set_conversion_file_dict_list(self):

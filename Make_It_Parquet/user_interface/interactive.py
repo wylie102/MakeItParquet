@@ -1,14 +1,14 @@
 #! /usr/bin/env python3
 import logging
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 from pathlib import Path
 
 if TYPE_CHECKING:
-    from user_interface.settings import Settings  # Import only for MyPy
+    from .settings import Settings  # Import only for MyPy
 
 
 def get_delimiter(
-    existing: Optional[str] = None,
+    existing: str | None = None,
     prompt_text: str = "Enter delimiter (t for tab, c for comma): ",
 ) -> str:
     """
@@ -27,7 +27,7 @@ def get_delimiter(
     return "\t" if answer == "t" else ","
 
 
-def prompt_for_txt_delimiter() -> dict:
+def prompt_for_txt_delimiter() -> dict[str, str]:
     """
     Prompt user for TXT file delimiter preference.
 
@@ -65,7 +65,9 @@ def prompt_excel_options(file: Path):
     return sheet, range_
 
 
-def prompt_for_output_format(settings: "Settings", ALIAS_TO_EXTENSION_MAP: dict):
+def prompt_for_output_format(
+    settings: "Settings", ALIAS_TO_EXTENSION_MAP: dict[str, str]
+):
     """
     Prompt user for output format, ensuring it differs from input.
 
@@ -101,8 +103,8 @@ def prompt_for_output_format(settings: "Settings", ALIAS_TO_EXTENSION_MAP: dict)
             output_ext = ALIAS_TO_EXTENSION_MAP[output_format]
             ## Input extension was automatically detected.
             if (
-                settings.input_output_flags.input_ext_cli_flag == 0
-                and settings.input_output_flags.input_ext_auto_detected_flag == 1
+                settings.input_output_flags.input_ext_supplied_from_cli == 0
+                and settings.input_output_flags.input_ext_auto_detected == 1
             ):
                 logging.error(
                     f"Conflict detected: Output format '{output_ext}' is the same as the auto-detected input format '{input_ext}'."
@@ -139,7 +141,7 @@ def prompt_for_output_format(settings: "Settings", ALIAS_TO_EXTENSION_MAP: dict)
         continue
 
 
-def prompt_for_input_format(ALIAS_TO_EXTENSION_MAP: dict):
+def prompt_for_input_format(ALIAS_TO_EXTENSION_MAP: dict[str, str]):
     """
     Prompt user for input format.
     """
@@ -162,7 +164,7 @@ def prompt_for_input_format(ALIAS_TO_EXTENSION_MAP: dict):
             continue
 
 
-def determine_excel_options(self):
+def determine_excel_options(args):
     """
     Set Excel-specific options from args or user prompts.
     Sets self.sheet and self.range based on args or user input.

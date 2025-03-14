@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Manages the conversion of files to different formats using DuckDB."""
 
-from typing import List, Dict, Any, Union
+from typing import List, Dict, Any, Optional, Union
 from queue import Queue
 import os
 import uuid
@@ -47,7 +47,7 @@ class ConversionManager:
         )
         self.conn = duckdb.connect(self.db_path)
         self.input_ext = file_manager.input_ext
-        self.output_ext = file_manager.output_ext
+        self.output_ext: Optional[str] = file_manager.output_ext
         self.settings = file_manager.settings
         self.import_queue: Queue[str] = Queue()
         self.pending_exports: List[Dict[str, str]] = []

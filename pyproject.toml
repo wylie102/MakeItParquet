@@ -20,7 +20,10 @@ dev = [
   "ruff",
   "isort",
   "bandit",
+  "basedpyright>=1.28.1",
+  "sqlfmt>=0.0.3",
+  "sqruff>=0.25.16",
 ]
 
 [tool.sqlfluff.core]
-dialect = "athena"
+dialect = "duckdb"

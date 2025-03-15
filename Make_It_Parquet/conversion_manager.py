@@ -1,19 +1,24 @@
 #!/usr/bin/env python3
 """Manages the conversion of files to different formats using DuckDB."""
 
-from typing import List, Dict, Any, Optional, Union
 from queue import Queue
 import os
 import uuid
 import tempfile
 import duckdb
-from user_interface.interactive import prompt_for_output_format
-import converters as conv
-from extension_mapping import (
+from Make_It_Parquet.user_interface.interactive import prompt_for_output_format
+import Make_It_Parquet.converters as conv
+from Make_It_Parquet.user_interface.settings import Settings
+from .extension_mapping import (
     ALIAS_TO_EXTENSION_MAP,
     import_class_map,
 )
-from file_manager import FileManager, DirectoryManager
+from Make_It_Parquet.file_information import FileInfo
+from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from Make_It_Parquet.file_manager import FileManager, DirectoryManager
 
 
 class ConversionManager:
@@ -35,36 +40,36 @@ class ConversionManager:
         one_in_one_out: Whether to export immediately after import
     """
 
-    def __init__(self, file_manager: Union[FileManager, DirectoryManager]) -> None:
+    def __init__(self, file_manager: "FileManager | DirectoryManager") -> None:
         """Initializes the conversion manager.
 
         Args:
             file_manager: BaseFileManager instance containing conversion settings
                 and file list information
         """
-        self.db_path = os.path.join(
+        self.db_path: str = os.path.join(
             tempfile.gettempdir(), f"make_it_parquet_{uuid.uuid4()}.db"
         )
-        self.conn = duckdb.connect(self.db_path)
-        self.input_ext = file_manager.input_ext
-        self.output_ext: Optional[str] = file_manager.output_ext
-        self.settings = file_manager.settings
-        self.import_queue: Queue[str] = Queue()
-        self.pending_exports: List[Dict[str, str]] = []
-        self.one_in_one_out: bool = self.output_ext is not None
+        self.conn: duckdb.DuckDBPyConnection = duckdb.connect(self.db_path)
+        self.input_ext: str | None = file_manager.input_ext
+        self.output_ext: str | None = file_manager.output_ext
+        self.settings: Settings = file_manager.settings
+        self.import_queue: Queue[Path] = Queue()
+        self.pending_exports: list[dict[str, str]] = []
+        self.one_in_one_out: bool = (
+            self.output_ext is not None
+        )  # TODO: ? Change to exists rather than the double negative
 
-        self._populate_import_queue(file_manager.conversion_file_dict_list)
+        self._populate_import_queue(file_manager.conversion_file_list)
 
-    def _populate_import_queue(
-        self, conversion_file_list: List[Dict[str, Any]]
-    ) -> None:
+    def _populate_import_queue(self, conversion_file_list: list[FileInfo]) -> None:
         """Populates the import queue with file paths.
 
         Args:
             conversion_file_list: List of file dictionaries containing paths
         """
         for file_info in conversion_file_list:
-            self.import_queue.put(file_info["path"])
+            self.import_queue.put(file_info.path)
 
     def _return_standard_import_class(self):
         """Returns a non-excel import class."""

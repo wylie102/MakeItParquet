@@ -6,13 +6,12 @@ This module contains the Settings class, which is responsible for managing and s
 Additionally, the InputOutputFlags class is used to manage flags related to how the input/output extensions are determined (e.g., from CLI arguments, auto-detected, or prompted).
 """
 
-from typing import Optional
-from ..file_information import (
-    create_file_info_dict,
+from Make_It_Parquet.file_information import (
+    create_file_info,
 )
 import argparse
-from .cli_parser import get_input_output_extensions
-from logger import Logger
+from Make_It_Parquet.user_interface.cli_parser import get_input_output_extensions
+from Make_It_Parquet.user_interface.logger import Logger
 
 
 class Settings:
@@ -37,7 +36,7 @@ class Settings:
         )
 
         # File information.
-        self.file_info_dict = create_file_info_dict(self.args.path)
+        self.file_info = create_file_info(self.args.path)
         # Initialise attributes for additional settings.
         self.excel_settings = None
         self.txt_settings = None

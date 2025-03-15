@@ -12,9 +12,9 @@ from typing import final
 
 from Make_It_Parquet.conversion_manager import ConversionManager
 
-from .file_manager import DirectoryManager, FileManager
-from .user_interface.cli_parser import parse_cli_arguments
-from .user_interface.settings import Settings
+from Make_It_Parquet.file_manager import DirectoryManager, FileManager
+from Make_It_Parquet.user_interface.cli_parser import parse_cli_arguments
+from Make_It_Parquet.user_interface.settings import Settings
 
 
 @final
@@ -45,7 +45,7 @@ class MakeItParquet:
         Returns:
             FileManager or DirectoryManager: Instance corresponding to the target type.
         """
-        if self.settings.file_info_dict["file_or_directory"] == "file":
+        if self.settings.file_info.file_or_directory == "file":
             return FileManager(self)
         else:
             return DirectoryManager(self)

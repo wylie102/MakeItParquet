@@ -14,19 +14,21 @@ The managers handle:
 """
 
 import os
-import re
 from collections import defaultdict
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from Make_It_Parquet.user_interface.settings import Settings
+from .user_interface.settings import Settings
 
-from .extension_mapping import ALIAS_TO_EXTENSION_MAP, ALLOWED_FILE_EXTENSIONS
-from .file_information import FileInfoDict, create_file_info_dict
-from .user_interface.interactive import prompt_for_input_format
+from Make_It_Parquet.extension_mapping import (
+    ALIAS_TO_EXTENSION_MAP,
+    ALLOWED_FILE_EXTENSIONS,
+)
+from Make_It_Parquet.file_information import FileInfo, create_file_info
+from Make_It_Parquet.user_interface.interactive import prompt_for_input_format
 
 if TYPE_CHECKING:
-    from .main import MakeItParquet
+    from Make_It_Parquet.main import MakeItParquet
 
 
 class BaseFileManager:
@@ -51,15 +53,15 @@ class BaseFileManager:
         Initialize the conversion manager.
         """
         # Attach MakeItParquet instance to the conversion manager.
-        self.mp: MakeItParquet = mp
+        self.mp: "MakeItParquet" = mp
         # Attach Settings instance to the conversion manager.
         self.settings: Settings = mp.settings
 
         # Store file information.
-        self.file_info_dict: FileInfoDict = self.settings.file_info_dict
+        self.file_info: FileInfo = self.settings.file_info
 
         # Store parsed CLI arguments by copying from Settings.
-        self.input_path: Path = self.file_info_dict["path"]
+        self.input_path: Path = self.file_info.path
         self.input_ext: str | None = self.settings.input_ext
         self.output_ext: str | None = self.settings.output_ext
 
@@ -79,8 +81,8 @@ class FileManager(BaseFileManager):
 
         # Check input extension and generate conversion file list.
         self._check_input_extension()
-        self.conversion_file_dict_list: list[dict[str, FileInfoDict]] = []
-        self._set_conversion_file_dict_list()
+        self.conversion_file_list: list[FileInfo] = []
+        self._set_conversion_file_list()
 
     def _check_input_extension(self):
         """
@@ -95,7 +97,7 @@ class FileManager(BaseFileManager):
         """
         # Determine the input extension.
         if not self.input_ext:
-            self.input_ext: str | None = self.file_info_dict["file_extension"]
+            self.input_ext: str | None = self.file_info.file_extension
 
         if (
             self.input_ext not in ALLOWED_FILE_EXTENSIONS
@@ -104,11 +106,10 @@ class FileManager(BaseFileManager):
                 f"Invalid file extension: {self.input_ext}. Allowed: {ALLOWED_FILE_EXTENSIONS}"
             )
 
-    def _set_conversion_file_dict_list(self):
+    def _set_conversion_file_list(self):
         """sets conversion file dict list in same format as that used in directory manager."""
         if self.input_ext:  # Ensure input_ext is not None
-            dict = {self.input_ext: self.file_info_dict}
-            self.conversion_file_dict_list.append(dict)
+            self.conversion_file_list.append(self.file_info)
 
 
 class DirectoryManager(BaseFileManager):
@@ -125,37 +126,16 @@ class DirectoryManager(BaseFileManager):
         super().__init__(mp)
 
         # initialize directory conversion attributes.
-        self.dir_file_list: list[FileInfoDict] = []
-        self.extension_file_groups: defaultdict[list] = defaultdict(list)
-        self.extension_counts: defaultdict[int] = defaultdict(int)
-        self.conversion_file_dict_list: list[dict[str, FileInfoDict]] = []
+        self.dir_file_list: list[FileInfo] = []
+        self.extension_file_groups: dict[str, list[FileInfo]] = defaultdict(list)
+        self.extension_counts: dict[str, int] = defaultdict(int)
+        self.conversion_file_list: list[FileInfo] = []
         self._set_conversion_file_dict_list()  # TODO: maybe make this more elegant, perhaps with a data class.
 
     def _set_conversion_file_dict_list(self):
         self._generate_extension_file_groups()  # creates dir_file_list, groups files into extension_file_groups, totals extension_counts.
         self._detect_majority_extension()  # detects majority extension, sets self.input_ext, sets conversion_file_list, updates flags.
         self._order_files_by_size()
-
-    def _create_list_of_file_info_dicts(self):
-        """Create a list of file information dictionaries from the directory."""
-        with os.scandir(self.input_path) as entries:
-            for entry in entries:
-                if entry.is_file():
-                    file_info = create_file_info_dict(entry)
-                    self.dir_file_list.append(file_info)
-
-    def _group_files_by_extension(self):
-        """Group files by extension and count the number of files for each extension."""
-        for file_info in self.dir_file_list:
-            ext = file_info["file_extension"]
-            if ext in ALLOWED_FILE_EXTENSIONS:
-                self.extension_file_groups[ext].append(file_info)
-                self.extension_counts[ext] += 1
-
-    def _exit_if_no_files(self):
-        """Exit the program if no compatible file types are found."""
-        if not self.extension_counts:
-            self.mp.exit_program("No compatible file types found", error_type="error")
 
     def _generate_extension_file_groups(self):
         """
@@ -165,6 +145,33 @@ class DirectoryManager(BaseFileManager):
         self._create_list_of_file_info_dicts()
         self._group_files_by_extension()
         self._exit_if_no_files()
+
+    def _create_list_of_file_info_dicts(self):
+        """Create a list of file information dictionaries from the directory."""
+        with os.scandir(self.input_path) as entries:
+            for entry in entries:
+                if entry.is_file():
+                    file_info: FileInfo = create_file_info(entry)
+                    self.dir_file_list.append(file_info)
+
+    def _group_files_by_extension(self):
+        """Group files by extension and count the number of files for each extension."""
+        for file_info in self.dir_file_list:
+            ext = file_info.file_extension
+            if ext in ALLOWED_FILE_EXTENSIONS:
+                self.extension_file_groups[ext].append(file_info)
+                self.extension_counts[ext] += 1
+
+    def _exit_if_no_files(self):
+        """Exit the program if no compatible file types are found."""
+        if not self.extension_counts:
+            self.mp.exit_program("No compatible file types found", error_type="error")
+
+    def _detect_majority_extension(self):
+        """determine the majority file extension in the directory."""
+        # Check for ambiguity: if more than one alias has the top count, ask the user to specify. self._sort_extensions_by_count()
+        if not self._check_for_ambiguous_file_types():
+            self._set_input_extension_and_file_list()
 
     def _sort_extensions_by_count(self):
         """Sort the extensions by the number of files in each group."""
@@ -188,108 +195,97 @@ class DirectoryManager(BaseFileManager):
 
     def _set_input_extension_and_file_list(self):
         """Set input extension and file list. Also updates flags."""
-        self.input_ext = list(self.extension_counts.keys())[0]
+        self.input_ext: str | None = list(self.extension_counts.keys())[0]
         self.settings.input_output_flags.set_flags("auto", self.input_ext, None)
-        self.conversion_file_dict_list = self.extension_file_groups[self.input_ext]
-
-    def _detect_majority_extension(self):
-        """determine the majority file extension in the directory."""
-        # Check for ambiguity: if more than one alias has the top count, ask the user to specify.
-        self._sort_extensions_by_count()
-        if not self._check_for_ambiguous_file_types():
-            self._set_input_extension_and_file_list()
+        self.conversion_file_list = self.extension_file_groups[self.input_ext]
 
     def _order_files_by_size(self):
         """
         Sort the file dictionary by file size.
 
-            Orders files from smallest to largest to optimize processing.
+        Orders files from smallest to largest to optimize processing.
         """
-        if self.input_ext:
-            input_ext = self.input_ext
-            self.conversion_file_dict_list.sort(
-                key=lambda x: x[input_ext][
-                    "file_size"
-                ],  # Access file_size through the nested structure
-                reverse=True,
-            )
+        self.conversion_file_list.sort(
+            key=lambda x: x.file_size,  # Access file_size through the nested structure
+            reverse=True,
+        )
 
 
 # TODO: (13-Feb-2025) Implement below when needed. DO NOT DELETE.
 
 
-# def replacer(match: re.Match) -> str: TODO: find out where this originally went.
-def replacer(input_ext: str, match: re.Match) -> str:
-    """
-    Replace the matched string in the input extension with the correct case.
-
-    Args:
-    match: re.Match
-        The matched string.
-
-    Returns:
-    str:
-        The matched string with the correct case.
-    """
-    orig = match.group()
-    if orig.isupper():
-        return input_ext.upper()
-    elif orig.islower():
-        return input_ext.lower()
-    elif orig[0].isupper() and orig[1:].islower():
-        return input_ext.capitalize()
-    else:
-        return input_ext
-
-
-def replace_alias_in_string(self) -> str:
-    """
-    Replace the matched string in the input extension with the correct case.
-
-    This method takes in the input extension and returns the same extension
-    with the correct case. If the extension is not found in the string, the
-    original string is returned.
-
-    Args:
-        self (str): The input extension.
-
-    Returns:
-        str: The matched string with the correct case.
-    """
-    pattern = re.compile(re.escape(self.input_ext), re.IGNORECASE)
-    result, count = pattern.subn(replacer, self.input_ext)
-    if count == 0:
-        result = f"{self.input_ext}"
-    return result
-
-
-def generate_output_name(self) -> str:
-    """
-    Generate a name for the output file.
-
-    If the input extension is present in the input file name (case-insensitive),
-    the output name is generated by replacing the input extension with the
-    correct case. Otherwise, the output name is generated by appending the
-    output extension to the input file name.
-
-    Returns:
-        str: The generated output name.
-    """
-    if self.input_ext and self.input_ext.lower() in self.input_path.name.lower():
-        return self._replace_alias_in_string()
-    else:
-        return f"{self.input_path.name}_{self.output_ext}"
-
-
-def generate_output_path(input_path: Path, output_ext: str) -> Path:
-    """
-    Generate a path for the output file.
-
-    Args:
-        input_path (Path): The path to the input file.
-        output_ext (str): The output file extension.
-
-    Returns:
-        Path: The path to the output file.
-    """
-    return input_path.with_suffix(f".{output_ext}")
+# # def replacer(match: re.Match) -> str: TODO: find out where this originally went.
+# def replacer(input_ext: str, match: re.Match) -> str:
+#     """
+#     Replace the matched string in the input extension with the correct case.
+#
+#     Args:
+#     match: re.Match
+#         The matched string.
+#
+#     Returns:
+#     str:
+#         The matched string with the correct case.
+#     """
+#     orig = match.group()
+#     if orig.isupper():
+#         return input_ext.upper()
+#     elif orig.islower():
+#         return input_ext.lower()
+#     elif orig[0].isupper() and orig[1:].islower():
+#         return input_ext.capitalize()
+#     else:
+#         return input_ext
+#
+#
+# def replace_alias_in_string(self) -> str:
+#     """
+#     Replace the matched string in the input extension with the correct case.
+#
+#     This method takes in the input extension and returns the same extension
+#     with the correct case. If the extension is not found in the string, the
+#     original string is returned.
+#
+#     Args:
+#         self (str): The input extension.
+#
+#     Returns:
+#         str: The matched string with the correct case.
+#     """
+#     pattern = re.compile(re.escape(self.input_ext), re.IGNORECASE)
+#     result, count = pattern.subn(replacer, self.input_ext)
+#     if count == 0:
+#         result = f"{self.input_ext}"
+#     return result
+#
+#
+# def generate_output_name(self) -> str:
+#     """
+#     Generate a name for the output file.
+#
+#     If the input extension is present in the input file name (case-insensitive),
+#     the output name is generated by replacing the input extension with the
+#     correct case. Otherwise, the output name is generated by appending the
+#     output extension to the input file name.
+#
+#     Returns:
+#         str: The generated output name.
+#     """
+#     if self.input_ext and self.input_ext.lower() in self.input_path.name.lower():
+#         return self._replace_alias_in_string()
+#     else:
+#         return f"{self.input_path.name}_{self.output_ext}"
+#
+#
+# def generate_output_path(input_path: Path, output_ext: str) -> Path:
+#     """
+#     Generate a path for the output file.
+#
+#     Args:
+#         input_path (Path): The path to the input file.
+#         output_ext (str): The output file extension.
+#
+#     Returns:
+#         Path: The path to the output file.
+#     """
+#     return input_path.with_suffix(f".{output_ext}")

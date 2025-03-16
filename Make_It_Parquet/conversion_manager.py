@@ -15,10 +15,8 @@ from .extension_mapping import (
 )
 from Make_It_Parquet.file_information import FileInfo
 from pathlib import Path
-from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from Make_It_Parquet.file_manager import FileManager, DirectoryManager
+from Make_It_Parquet.file_manager import FileManager, DirectoryManager
 
 
 class ConversionManager:
@@ -40,7 +38,7 @@ class ConversionManager:
         one_in_one_out: Whether to export immediately after import
     """
 
-    def __init__(self, file_manager: "FileManager | DirectoryManager") -> None:
+    def __init__(self, file_manager: FileManager | DirectoryManager) -> None:
         """Initializes the conversion manager.
 
         Args:
@@ -55,7 +53,7 @@ class ConversionManager:
         self.output_ext: str | None = file_manager.output_ext
         self.settings: Settings = file_manager.settings
         self.import_queue: Queue[Path] = Queue()
-        self.pending_exports: list[dict[str, str]] = []
+        self.pending_exports: list[dict[str, Path | str]] = []
         self.one_in_one_out: bool = (
             self.output_ext is not None
         )  # TODO: ? Change to exists rather than the double negative
@@ -70,16 +68,6 @@ class ConversionManager:
         """
         for file_info in conversion_file_list:
             self.import_queue.put(file_info.path)
-
-    def _return_standard_import_class(self):
-        """Returns a non-excel import class."""
-        if self.input_ext:
-            return import_class_map[self.input_ext]
-
-    def _return_excel_import_class(self):
-        """Returns an excel import class."""
-        # TODO: 21-Feb-2025: Write excel_utils.py functions/methods to load excel extension.
-        pass  # TODO: 21-Feb-2025: Refactor excel_utils.py
 
     def _generate_import_class(self):
         """
@@ -98,6 +86,16 @@ class ConversionManager:
             self._return_standard_import_class()
         else:
             self._return_excel_import_class()
+
+    def _return_standard_import_class(self):
+        """Returns a non-excel import class."""
+        if self.input_ext:
+            return import_class_map[self.input_ext]
+
+    def _return_excel_import_class(self):
+        """Returns an excel import class."""
+        # TODO: 21-Feb-2025: Write excel_utils.py functions/methods to load excel extension.
+        pass  # TODO: 21-Feb-2025: Refactor excel_utils.py
 
     def _determine_output_extension(self):
         """
@@ -165,7 +163,7 @@ class ConversionManager:
         _ = self.conn.execute(import_sql)
         return table_name
 
-    def _export_file(self, file_path: str, table_name: str) -> None:
+    def _export_file(self, file_path: Path, table_name: str) -> None:
         """Exports a table to a file with the specified output extension.
 
         Args:
@@ -234,16 +232,6 @@ class ConversionManager:
         for pending in self.pending_exports:
             self._export_file(pending["file_path"], pending["table_name"])
         self.pending_exports.clear()
-
-    def set_output_extension(
-        self, output_ext: str
-    ) -> None:  # TODO: in main file manager check whether it is worth using this or setting it directly.
-        """Sets the output file extension for exports.
-
-        Args:
-            output_ext: The file extension to use for exported files
-        """
-        self.output_ext = output_ext
 
     def close_connection(self, cleanup_db_file: bool = False) -> None:
         """Closes the DuckDB connection and optionally removes the DB file.

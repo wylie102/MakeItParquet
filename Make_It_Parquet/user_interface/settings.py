@@ -9,8 +9,10 @@ Additionally, the InputOutputFlags class is used to manage flags related to how 
 from Make_It_Parquet.file_information import (
     create_file_info,
 )
-import argparse
-from Make_It_Parquet.user_interface.cli_parser import get_input_output_extensions
+from Make_It_Parquet.user_interface.cli_parser import (
+    CLIArgs,
+    get_input_output_extensions,
+)
 from Make_It_Parquet.user_interface.logger import Logger
 
 
@@ -19,12 +21,12 @@ class Settings:
     Settings class for managing application configuration.
     """
 
-    def __init__(self, args: argparse.Namespace) -> None:
+    def __init__(self, args: CLIArgs) -> None:
         """
         Initialize the Settings object.
         """
         # CLI arguments.
-        self.args: argparse.Namespace = args
+        self.args: CLIArgs = args
         # Logger.
         self.logger: Logger = Logger(self.args.log_level)
         # Input/output flags.

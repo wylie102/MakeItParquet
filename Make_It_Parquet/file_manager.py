@@ -124,9 +124,9 @@ class DirectoryManager(BaseFileManager):
         self.extension_file_groups: dict[str, list[FileInfo]] = defaultdict(list)
         self.extension_counts: dict[str, int] = defaultdict(int)
         self.conversion_file_list: list[FileInfo] = []
-        self._set_conversion_file_dict_list()  # TODO: maybe make this more elegant, perhaps with a data class.
+        self._set_conversion_file_list()  # TODO: maybe make this more elegant, perhaps with a data class.
 
-    def _set_conversion_file_dict_list(self):
+    def _set_conversion_file_list(self):
         self._generate_extension_file_groups()  # creates dir_file_list, groups files into extension_file_groups, totals extension_counts.
         self._detect_majority_extension()  # detects majority extension, sets self.input_ext, sets conversion_file_list, updates flags.
         self._order_files_by_size()

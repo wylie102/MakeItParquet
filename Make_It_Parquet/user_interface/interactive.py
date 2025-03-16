@@ -2,6 +2,7 @@
 import logging
 from typing import TYPE_CHECKING
 from pathlib import Path
+import argparse
 
 if TYPE_CHECKING:
     from .settings import Settings  # Import only for MyPy
@@ -164,26 +165,26 @@ def prompt_for_input_format(ALIAS_TO_EXTENSION_MAP: dict[str, str]):
             continue
 
 
-def determine_excel_options(args):
+def determine_excel_options(args: argparse.Namespace):
     """
     Set Excel-specific options from args or user prompts.
     Sets self.sheet and self.range based on args or user input.
     """
     # If Excel options are not provided, prompt for them.
-    self.sheet = self.args.sheet
-    self.range = self.args.range
-    if self.sheet is None and self.range is None:
-        self.sheet, self.range = prompt_excel_options(self.input_path)
+    sheet = args.sheet
+    range = args.range
+    if sheet is None and range is None:
+        sheet, range = prompt_excel_options(input_path)
 
 
-def determine_txt_options(self):
+def determine_txt_options(args: argparse.Namespace):
     """
     Set TXT-specific options from args or user prompts.
     """
     # For TXT output, if no delimiter provided, prompt for it.
-    self.delimiter = self.args.delimiter
-    if self.delimiter is None:
-        self.delimiter = prompt_for_txt_delimiter()
+    delimiter = args.delimiter
+    if delimiter is None:
+        delimiter = prompt_for_txt_delimiter()
 
     txt_kwargs = prompt_for_txt_delimiter()
-    self.args.delimiter = txt_kwargs["delimiter"]
+    args.delimiter = txt_kwargs["delimiter"]

@@ -2,6 +2,7 @@ import logging
 from logging.handlers import QueueHandler, QueueListener
 import queue
 import sys
+from typing import TextIO
 
 
 class Logger(logging.Logger):
@@ -9,16 +10,32 @@ class Logger(logging.Logger):
     A logger that can be used to log messages to the console via asynchronous queue based logging.
     """
 
-    def __init__(self, log_level: str):
+    def __init__(self, log_level: str | None) -> None:
         super().__init__("Make-it-Parquet!")
-        self.log_queue = queue.Queue()
-        self.logger = logging.getLogger("Make-it-Parquet!")
+        self.log_queue: queue.Queue[str] = queue.Queue()
+        self.logger: logging.Logger = logging.getLogger("Make-it-Parquet!")
 
-        self.default_log_level = logging.INFO
-        self.supplied_log_level = log_level.strip().upper()
-        self.active_log_level = None
+        self.default_log_level: int = logging.INFO
+        self.supplied_log_level: str | None = self._verify_log_input(log_level)
+        self.active_log_level: int = self._set_logging_level()
 
         self._configure_logging()
+
+    def _verify_log_input(self, log_level: str | None) -> str | None:
+        """cleans supplied log level, if None returns INFO."""
+        if log_level:
+            return log_level.strip().upper()
+        else:
+            return None
+
+    def _set_logging_level(self) -> int:
+        """
+        Set logging level.
+        """
+        if self.supplied_log_level:
+            return getattr(logging, self.supplied_log_level, self.default_log_level)
+        else:
+            return self.default_log_level
 
     def _configure_logging(self):
         """
@@ -26,20 +43,13 @@ class Logger(logging.Logger):
 
         Sets up queue-based logging with console output.
         """
-        self._set_logging_level()
-        self.console_handler = self._setup_console_handler()
-        self.queue_handler = self._setup_queue_handler()
-        self.queue_listener = self._setup_queue_listener()
-        self.queue_listener.start()
-
-    def _set_logging_level(self):
-        """
-        Set logging level.
-        """
-        self.active_log_level = getattr(
-            logging, self.supplied_log_level, self.default_log_level
-        )
         self.logger.setLevel(self.active_log_level)
+        self.console_handler: logging.StreamHandler[TextIO] = (
+            self._setup_console_handler()
+        )
+        self.queue_handler: QueueHandler = self._setup_queue_handler()
+        self.queue_listener: QueueListener = self._setup_queue_listener()
+        self.queue_listener.start()
 
     def _setup_console_handler(self):
         """

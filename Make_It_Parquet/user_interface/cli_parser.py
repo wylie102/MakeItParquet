@@ -1,6 +1,7 @@
 #! /usr/bin/env python3
 
 import argparse
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 import logging
 from pathlib import Path
@@ -10,7 +11,20 @@ if TYPE_CHECKING:
     from Make_It_Parquet.user_interface.settings import InputOutputFlags
 
 
-def parse_cli_arguments() -> argparse.Namespace:
+@dataclass
+class CLIArgs:
+    """A dataclass to ensure correct typing of command line arguments"""
+
+    input_path: Path
+    output_path: Path | None
+    input_format: str | None
+    output_format: str | None
+    excel_sheet: str | None
+    excel_range: str | None
+    log_level: str | None
+
+
+def parse_cli_arguments() -> CLIArgs:
     """
     Parse command line arguments.
 
@@ -50,9 +64,20 @@ def parse_cli_arguments() -> argparse.Namespace:
         help="Set the logging level (e.g., DEBUG, INFO, WARNING)",
         default="INFO",
     )
+
     # Parse arguments and create argparse.Namespace object (args).
     args = parser.parse_args()
-    return args
+
+    # asign args to CLIArgs
+    return CLIArgs(
+        input_path=args.input_path,
+        output_path=args.output_path,
+        input_format=args.input_format,
+        output_format=args.output_format,
+        excel_sheet=args.excel_sheet,
+        excel_range=args.excel_range,
+        log_level=args.log_level,
+    )
 
 
 def _check_format_supported(format: str) -> bool:
@@ -110,7 +135,7 @@ def _input_output_extensions_same(
 
 
 def get_input_output_extensions(
-    args: argparse.Namespace, input_output_flags: "InputOutputFlags"
+    args: CLIArgs, input_output_flags: "InputOutputFlags"
 ) -> tuple[str | None, str | None]:
     """
     Validate input and output format arguments that were passed in directly from the command line.

@@ -1,4 +1,4 @@
-# !/usr/bin/env python3
+# !/usr/bin/env python3 --script
 # /// script
 # dependencies = [
 #     "duckdb",
@@ -8,11 +8,10 @@
 Make-it-Parquet!: A data file conversion tool powered by DuckDB.
 """
 
-import argparse
 from Make_It_Parquet.conversion_manager import ConversionManager
 
 from Make_It_Parquet.file_manager import DirectoryManager, FileManager
-from Make_It_Parquet.user_interface.cli_parser import parse_cli_arguments
+from Make_It_Parquet.user_interface.cli_parser import parse_cli_arguments, CLIArgs
 from Make_It_Parquet.user_interface.settings import Settings
 
 
@@ -37,16 +36,20 @@ def create_file_manager(
 
 def main() -> None:
     """
-    Initialises the application settings and triggers the conversion process by
+    Initialises the application settings and triggers the conversion process.
     """
-    args: argparse.Namespace = parse_cli_arguments()
+    # Parse CLI arguments and store apliccable ones in Settings object.
+    args: CLIArgs = parse_cli_arguments()
     settings: Settings = Settings(args)
+
+    # Create FileManager and ConversionManager instances to manage conversion and file naming processes.
     file_manager: FileManager | DirectoryManager = create_file_manager(settings)
-    conversion_manager: ConversionManager = ConversionManager(
-        file_manager
-    )  # TODO: check wether file manager needs to be passed here or just a subset of file manager.
+    conversion_manager: ConversionManager = ConversionManager(file_manager)
+
+    # Trigger conversion process.
     conversion_manager.run_conversion()  # TODO: This function call is a placeholder. Create a function which starts the conversion process and run it, may be two functions, one in file manager and another in conversion manager.
 
+    # End program and ensure correct cleanup.
     settings.exit_program("Conversion complete.")
 
 

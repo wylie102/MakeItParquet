@@ -7,7 +7,7 @@ from pathlib import Path
 from ..extension_mapping import ALIAS_TO_EXTENSION_MAP
 
 if TYPE_CHECKING:
-    from .settings import InputOutputFlags
+    from Make_It_Parquet.user_interface.settings import InputOutputFlags
 
 
 def parse_cli_arguments() -> argparse.Namespace:
@@ -21,31 +21,31 @@ def parse_cli_arguments() -> argparse.Namespace:
         description="Make-it-Parquet!: Conversion of data files powered by DuckDB"
     )
     # Input path.
-    parser.add_argument(
+    _ = parser.add_argument(
         "input_path", help="Path to the input file or directory", type=Path
     )
     # Output path.
-    parser.add_argument(
+    _ = parser.add_argument(
         "-op", "--output_path", help="Specify output file path", type=Path
     )
     # Input format.
-    parser.add_argument(
+    _ = parser.add_argument(
         "-i", "--input_format", help="Specify input file format", type=str
     )
     # Output format.
-    parser.add_argument(
+    _ = parser.add_argument(
         "-o", "--output_format", help="Specify output file format", type=str
     )
     # Excel sheet.
-    parser.add_argument(
+    _ = parser.add_argument(
         "-es", "--excel_sheet", help="Excel sheet (name or number)", type=str
     )
     # Excel range.
-    parser.add_argument(
+    _ = parser.add_argument(
         "-er", "--excel_range", help="Excel range (e.g., A2:E7)", type=str
     )
     # Log level.
-    parser.add_argument(
+    _ = parser.add_argument(
         "--log-level",
         help="Set the logging level (e.g., DEBUG, INFO, WARNING)",
         default="INFO",

@@ -136,7 +136,7 @@ class ConversionManager:
 
         raise ValueError(f"Unsupported output extension: {self.output_ext}")
 
-    def _generate_table_name(self, file_path: str) -> str:
+    def _generate_table_name(self, file_path: Path) -> str:
         """Generates a unique table name for the imported file.
 
         Args:
@@ -145,10 +145,10 @@ class ConversionManager:
         Returns:
             A unique table name based on the filename and a UUID
         """
-        base = os.path.splitext(os.path.basename(file_path))[0]
+        base = file_path.stem  # TODO: check origin of file_path to check it actually has been turned into a Path object.
         return f"{base}_{uuid.uuid4().hex[:8]}"
 
-    def _import_file(self, file_path: str) -> str:
+    def _import_file(self, file_path: Path) -> str:
         """Imports a file into a DuckDB table.
 
         Args:
@@ -162,7 +162,7 @@ class ConversionManager:
         """
         table_name = self._generate_table_name(file_path)
         import_sql = f"CREATE TABLE {table_name} AS SELECT * FROM read_csv_auto('{file_path}')"  # TODO: this needs to call correct import class for the file ext.
-        self.conn.execute(import_sql)
+        _ = self.conn.execute(import_sql)
         return table_name
 
     def _export_file(self, file_path: str, table_name: str) -> None:
@@ -180,10 +180,10 @@ class ConversionManager:
         output_file = os.path.join(output_dir, f"{base}.{self.output_ext}")
 
         export_sql = f"COPY {table_name} TO '{output_file}' (FORMAT '{self.output_ext}')"  # TODO: may also need to do use output class here, although with moving to using persistent db and copy it may not be necessary.
-        self.conn.execute(
+        _ = self.conn.execute(
             export_sql
         )  # TODO: may need a check here to ensure successful export before dropping tables.
-        self.conn.execute(f"DROP TABLE {table_name}")
+        _ = self.conn.execute(f"DROP TABLE {table_name}")
 
         self._log_success(file_path, output_file)
 

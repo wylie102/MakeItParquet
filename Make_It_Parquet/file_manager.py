@@ -16,9 +16,8 @@ The managers handle:
 import os
 from collections import defaultdict
 from pathlib import Path
-from typing import TYPE_CHECKING
 
-from .user_interface.settings import Settings
+from Make_It_Parquet.user_interface.settings import Settings
 
 from Make_It_Parquet.extension_mapping import (
     ALIAS_TO_EXTENSION_MAP,
@@ -26,9 +25,6 @@ from Make_It_Parquet.extension_mapping import (
 )
 from Make_It_Parquet.file_information import FileInfo, create_file_info
 from Make_It_Parquet.user_interface.interactive import prompt_for_input_format
-
-if TYPE_CHECKING:
-    from Make_It_Parquet.main import MakeItParquet
 
 
 class BaseFileManager:
@@ -48,14 +44,12 @@ class BaseFileManager:
         export_queue_status_flag: Flag indicating whether the export queue is empty
     """
 
-    def __init__(self, mp: "MakeItParquet"):
+    def __init__(self, settings: Settings):
         """
         Initialize the conversion manager.
         """
-        # Attach MakeItParquet instance to the conversion manager.
-        self.mp: "MakeItParquet" = mp
         # Attach Settings instance to the conversion manager.
-        self.settings: Settings = mp.settings
+        self.settings: Settings = settings
 
         # Store file information.
         self.file_info: FileInfo = self.settings.file_info
@@ -76,8 +70,8 @@ class FileManager(BaseFileManager):
         Inherits all attributes from BaseConversionManager
     """
 
-    def __init__(self, mp: "MakeItParquet"):
-        super().__init__(mp)
+    def __init__(self, settings: Settings):
+        super().__init__(settings)
 
         # Check input extension and generate conversion file list.
         self._check_input_extension()
@@ -102,7 +96,7 @@ class FileManager(BaseFileManager):
         if (
             self.input_ext not in ALLOWED_FILE_EXTENSIONS
         ):  # TODO consider changing to allow re-entering of input extension or checking the input/output flags, and/or performing a manual check on the input type
-            self.mp.exit_program(
+            self.settings.exit_program(
                 f"Invalid file extension: {self.input_ext}. Allowed: {ALLOWED_FILE_EXTENSIONS}"
             )
 
@@ -122,8 +116,8 @@ class DirectoryManager(BaseFileManager):
         Inherits all attributes from BaseConversionManager
     """
 
-    def __init__(self, mp: "MakeItParquet"):
-        super().__init__(mp)
+    def __init__(self, settings: Settings):
+        super().__init__(settings)
 
         # initialize directory conversion attributes.
         self.dir_file_list: list[FileInfo] = []
@@ -165,7 +159,9 @@ class DirectoryManager(BaseFileManager):
     def _exit_if_no_files(self):
         """Exit the program if no compatible file types are found."""
         if not self.extension_counts:
-            self.mp.exit_program("No compatible file types found", error_type="error")
+            self.settings.exit_program(
+                "No compatible file types found", error_type="error"
+            )
 
     def _detect_majority_extension(self):
         """determine the majority file extension in the directory."""

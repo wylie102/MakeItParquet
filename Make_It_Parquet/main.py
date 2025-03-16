@@ -8,8 +8,7 @@
 Make-it-Parquet!: A data file conversion tool powered by DuckDB.
 """
 
-from typing import final
-
+import argparse
 from Make_It_Parquet.conversion_manager import ConversionManager
 
 from Make_It_Parquet.file_manager import DirectoryManager, FileManager
@@ -17,62 +16,38 @@ from Make_It_Parquet.user_interface.cli_parser import parse_cli_arguments
 from Make_It_Parquet.user_interface.settings import Settings
 
 
-@final
-class MakeItParquet:
+def create_file_manager(
+    settings: Settings,
+) -> FileManager | DirectoryManager:
     """
-    Main class for the Make-it-Parquet! conversion tool.
+    Determines the appropriate conversion manager (file or directory) depending on
+    the input provided via the settings object.
+
+    Args:
+        settings (Settings): The application settings and configuration.
+
+    Returns:
+        FileManager or DirectoryManager: Instance corresponding to the target type.
     """
-
-    def __init__(self):
-        """
-        Initialise the MakeItParquet class.
-        """
-        self.args = parse_cli_arguments()
-        self.settings = Settings(self.args)
-        self.file_manager = self._create_file_manager()
-        self.conversion_manager = ConversionManager(self.file_manager)
-
-    def _create_file_manager(
-        self,
-    ) -> FileManager | DirectoryManager:
-        """
-        Determines the appropriate conversion manager (file or directory) depending on
-        the input provided via the settings object.
-
-        Args:
-            settings (Settings): The application settings and configuration.
-
-        Returns:
-            FileManager or DirectoryManager: Instance corresponding to the target type.
-        """
-        if self.settings.file_info.file_or_directory == "file":
-            return FileManager(self)
-        else:
-            return DirectoryManager(self)
-
-    def exit_program(self, message: str, error_type: str | None = "error") -> None:
-        """
-        Exit program with logging and cleanup.
-
-        Args:
-            message: Error message to log
-            error_type: Type of error ('error' or 'exception')
-        """
-        if error_type == "error":
-            self.settings.logger.error(message)
-        elif error_type == "exception":
-            self.settings.logger.exception(message)
-
-        self.settings.logger.stop_logging()
-        exit(1)
+    if settings.file_info.file_or_directory == "file":
+        return FileManager(settings)
+    else:
+        return DirectoryManager(settings)
 
 
 def main() -> None:
     """
-    Initialises the application settings and triggers the conversion process by creating
+    Initialises the application settings and triggers the conversion process by
     """
-    mp = MakeItParquet()
-    mp.exit_program("Conversion complete.")
+    args: argparse.Namespace = parse_cli_arguments()
+    settings: Settings = Settings(args)
+    file_manager: FileManager | DirectoryManager = create_file_manager(settings)
+    conversion_manager: ConversionManager = ConversionManager(
+        file_manager
+    )  # TODO: check wether file manager needs to be passed here or just a subset of file manager.
+    conversion_manager.run_conversion()  # TODO: This function call is a placeholder. Create a function which starts the conversion process and run it, may be two functions, one in file manager and another in conversion manager.
+
+    settings.exit_program("Conversion complete.")
 
 
 if __name__ == "__main__":

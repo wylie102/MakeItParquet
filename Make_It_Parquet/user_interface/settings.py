@@ -24,22 +24,41 @@ class Settings:
         Initialize the Settings object.
         """
         # CLI arguments.
-        self.args = args
+        self.args: argparse.Namespace = args
         # Logger.
-        self.logger = Logger(self.args.log_level)
+        self.logger: Logger = Logger(self.args.log_level)
         # Input/output flags.
-        self.input_output_flags = InputOutputFlags()
+        self.input_output_flags: InputOutputFlags = InputOutputFlags()
 
         # get input and output extensions from CLI arguments (if provided).
+        self.input_ext: str | None
+        self.output_ext: str | None
         self.input_ext, self.output_ext = get_input_output_extensions(
             self.args, self.input_output_flags
         )
 
         # File information.
         self.file_info = create_file_info(self.args.path)
-        # Initialise attributes for additional settings.
-        self.excel_settings = None
-        self.txt_settings = None
+
+        # # Initialise attributes for additional settings.
+        # self.excel_settings = None
+        # self.txt_settings = None
+
+    def exit_program(self, message: str, error_type: str | None = "error") -> None:
+        """
+        Exit program with logging and cleanup.
+
+        Args:
+            message: Error message to log
+            error_type: Type of error ('error' or 'exception')
+        """
+        if error_type == "error":
+            self.logger.error(message)
+        elif error_type == "exception":
+            self.logger.exception(message)
+
+        self.logger.stop_logging()
+        exit(1)
 
 
 class InputOutputFlags:
@@ -59,7 +78,7 @@ class InputOutputFlags:
         self.input_ext_supplied_from_prompt: int = 0
 
     def set_flags(
-        self, environment: str, input_ext: Optional[str], output_ext: Optional[str]
+        self, environment: str, input_ext: str | None, output_ext: str | None
     ):
         """
         Set the flags based on the environment.
@@ -74,7 +93,7 @@ class InputOutputFlags:
         else:
             raise ValueError(f"Invalid environment: {environment}")
 
-    def set_cli_flags(self, input_ext: Optional[str], output_ext: Optional[str]):
+    def set_cli_flags(self, input_ext: str | None, output_ext: str | None):
         """
         Set the CLI flags.
         """
@@ -86,7 +105,7 @@ class InputOutputFlags:
             self.output_ext_supplied_from_cli = 1
             self.output_ext_supplied_from_prompt = 0
 
-    def set_prompt_flags(self, input_ext: Optional[str], output_ext: Optional[str]):
+    def set_prompt_flags(self, input_ext: str | None, output_ext: str | None):
         """
         Set the prompt flags.
         """

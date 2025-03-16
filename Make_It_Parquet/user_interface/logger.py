@@ -16,24 +16,16 @@ class Logger(logging.Logger):
         self.logger: logging.Logger = logging.getLogger("Make-it-Parquet!")
 
         self.default_log_level: int = logging.INFO
-        self.supplied_log_level: str | None = self._verify_log_input(log_level)
-        self.active_log_level: int = self._set_logging_level()
+        self.active_log_level: int = self._set_logging_level(log_level)
 
         self._configure_logging()
 
-    def _verify_log_input(self, log_level: str | None) -> str | None:
-        """cleans supplied log level, if None returns INFO."""
+    def _set_logging_level(self, log_level: str | None) -> int:
+        """Cleans supplied log level and returns verified numeric logging level.
+        If None given or value is eroneous returns value of default_log_level."""
         if log_level:
-            return log_level.strip().upper()
-        else:
-            return None
-
-    def _set_logging_level(self) -> int:
-        """
-        Set logging level.
-        """
-        if self.supplied_log_level:
-            return getattr(logging, self.supplied_log_level, self.default_log_level)
+            verified_log_level: str = log_level.strip().upper()
+            return getattr(logging, verified_log_level, self.default_log_level)
         else:
             return self.default_log_level
 

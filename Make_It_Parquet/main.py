@@ -1,4 +1,4 @@
-# !/usr/bin/env python3 --script
+#!/usr/bin/env python3 --script
 # /// script
 # dependencies = [
 #     "duckdb",
@@ -44,6 +44,7 @@ def main() -> None:
 
     # Create FileManager and ConversionManager instances to manage conversion and file naming processes.
     file_manager: FileManager | DirectoryManager = create_file_manager(settings)
+    file_manager.analyze_files()
     conversion_manager: ConversionManager = ConversionManager(file_manager)
 
     # Trigger conversion process.

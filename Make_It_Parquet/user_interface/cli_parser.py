@@ -66,13 +66,13 @@ def parse_cli_arguments() -> CLIArgs:
 
     # asign args to CLIArgs
     return CLIArgs(
-        input_path=args.input_path,
-        output_path=args.output_path,
-        input_format=args.input_format,
-        output_format=args.output_format,
-        excel_sheet=args.excel_sheet,
-        excel_range=args.excel_range,
-        log_level=args.log_level,
+        input_path=args.input_path,  # pyright: ignore[reportAny]
+        output_path=args.output_path,  # pyright: ignore[reportAny]
+        input_format=args.input_format,  # pyright: ignore[reportAny]
+        output_format=args.output_format,  # pyright: ignore[reportAny]
+        excel_sheet=args.excel_sheet,  # pyright: ignore[reportAny]
+        excel_range=args.excel_range,  # pyright: ignore[reportAny]
+        log_level=args.log_level,  # pyright: ignore[reportAny]
     )
 
 

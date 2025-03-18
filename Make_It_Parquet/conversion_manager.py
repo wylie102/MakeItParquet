@@ -7,11 +7,10 @@ import uuid
 import tempfile
 import duckdb
 from Make_It_Parquet.user_interface.interactive import prompt_for_output_format
-import Make_It_Parquet.converters as conv
+import Make_It_Parquet.conversion_data as conv
 from Make_It_Parquet.user_interface.settings import Settings
 from .extension_mapping import (
     ALIAS_TO_EXTENSION_MAP,
-    import_class_map,
 )
 from Make_It_Parquet.file_information import FileInfo
 from pathlib import Path

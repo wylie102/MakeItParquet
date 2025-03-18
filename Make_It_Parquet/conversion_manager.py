@@ -6,9 +6,8 @@ import os
 import uuid
 import tempfile
 import duckdb
+from Make_It_Parquet.user_interface.cli_parser import InputOutputFlags
 from Make_It_Parquet.user_interface.interactive import prompt_for_output_format
-import Make_It_Parquet.conversion_data as conv
-from Make_It_Parquet.user_interface.settings import Settings
 from .extension_mapping import (
     ALIAS_TO_EXTENSION_MAP,
 )
@@ -48,13 +47,11 @@ class ConversionManager:
             tempfile.gettempdir(), f"make_it_parquet_{uuid.uuid4()}.db"
         )
         self.conn: duckdb.DuckDBPyConnection = duckdb.connect(self.db_path)
-        self.input_ext: str | None = file_manager.input_ext
-        self.output_ext: str | None = file_manager.output_ext
-        self.settings: Settings = file_manager.settings
+        self.file_manager: FileManager | DirectoryManager = file_manager
         self.import_queue: Queue[Path] = Queue()
         self.pending_exports: list[dict[str, Path | str]] = []
         self.one_in_one_out: bool = (
-            self.output_ext is not None
+            self.file_manager.settings.output_ext is not None
         )  # TODO: ? Change to exists rather than the double negative
 
         self._populate_import_queue(file_manager.conversion_file_list)
@@ -68,34 +65,6 @@ class ConversionManager:
         for file_info in conversion_file_list:
             self.import_queue.put(file_info.path)
 
-    def _generate_import_class(self):
-        """
-        Create appropriate input class based on file extension.
-
-        Determines and instantiates the correct input class based on the input
-        file extension. Handles special cases for Excel files based on output format.
-
-        Returns:
-            BaseInputConnection: Instance of appropriate input class for the file type
-
-        Raises:
-            ValueError: If input extension is not supported
-        """
-        if not self.input_ext == ".xlsx":
-            self._return_standard_import_class()
-        else:
-            self._return_excel_import_class()
-
-    def _return_standard_import_class(self):
-        """Returns a non-excel import class."""
-        if self.input_ext:
-            return import_class_map[self.input_ext]
-
-    def _return_excel_import_class(self):
-        """Returns an excel import class."""
-        # TODO: 21-Feb-2025: Write excel_utils.py functions/methods to load excel extension.
-        pass  # TODO: 21-Feb-2025: Refactor excel_utils.py
-
     def _determine_output_extension(self):
         """
         Set the output file extension.
@@ -103,47 +72,12 @@ class ConversionManager:
         If output extension is not already set in settings, prompts user to select
         one. Validates that output format differs from input format.
         """
-        if not self.output_ext:
-            prompt_for_output_format(self.settings, ALIAS_TO_EXTENSION_MAP)
-
-    def _generate_export_class(self):
-        """
-        Create appropriate output class based on output format.
-
-        Determines and instantiates the correct output class based on the desired
-        output format.
-
-        Returns:
-            BaseOutputConnection: Instance of appropriate output class for the format
-
-        Raises:
-            ValueError: If output format is not supported
-        """
-        export_class_map = {
-            "csv": conv.CSVOutput,
-            "tsv": conv.TsvOutput,
-            "txt": conv.TxtOutput,
-            "json": conv.JSONOutput,
-            "parquet": conv.ParquetOutput,
-            "excel": conv.ExcelOutput,
-        }
-
-        if self.output_ext in export_class_map:
-            return export_class_map[self.output_ext]()
-
-        raise ValueError(f"Unsupported output extension: {self.output_ext}")
-
-    def _generate_table_name(self, file_path: Path) -> str:
-        """Generates a unique table name for the imported file.
-
-        Args:
-            file_path: Path to the file being imported
-
-        Returns:
-            A unique table name based on the filename and a UUID
-        """
-        base = file_path.stem  # TODO: check origin of file_path to check it actually has been turned into a Path object.
-        return f"{base}_{uuid.uuid4().hex[:8]}"
+        if not self.file_manager.settings.output_ext:
+            prompt_for_output_format(
+                self.file_manager.settings.input_ext,
+                ALIAS_TO_EXTENSION_MAP,
+                self.file_manager.settings.InputOutputFlags,
+            )
 
     def _import_file(self, file_path: Path) -> str:
         """Imports a file into a DuckDB table.

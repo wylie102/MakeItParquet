@@ -3,12 +3,11 @@
 from pathlib import Path
 import os
 import stat
-from dataclasses import dataclass
 import re
+from typing import NamedTuple
 
 
-@dataclass
-class FileInfo:
+class FileInfo(NamedTuple):
     path: Path
     stat_obj: os.stat_result
     file_name: str

@@ -2,7 +2,7 @@
 
 
 # Allowed file extensions.
-ALLOWED_FILE_EXTENSIONS = {".csv", "tsv", "txt", ".json", ".parquet", ".xlsx"}
+ALLOWED_FILE_EXTENSIONS: set[str] = {".csv", "tsv", "txt", ".json", ".parquet", ".xlsx"}
 
 # Alias to extension map.
 ALIAS_TO_EXTENSION_MAP: dict[str, str] = {

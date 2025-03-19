@@ -6,7 +6,6 @@ import os
 import uuid
 import tempfile
 import duckdb
-from Make_It_Parquet.user_interface.cli_parser import InputOutputFlags
 from Make_It_Parquet.user_interface.interactive import prompt_for_output_format
 from .extension_mapping import (
     ALIAS_TO_EXTENSION_MAP,
@@ -51,7 +50,7 @@ class ConversionManager:
         self.import_queue: Queue[Path] = Queue()
         self.pending_exports: list[dict[str, Path | str]] = []
         self.one_in_one_out: bool = (
-            self.file_manager.settings.output_ext is not None
+            self.file_manager.settings.supplied_output_ext is not None
         )  # TODO: ? Change to exists rather than the double negative
 
         self._populate_import_queue(file_manager.conversion_file_list)
@@ -63,7 +62,7 @@ class ConversionManager:
             conversion_file_list: List of file dictionaries containing paths
         """
         for file_info in conversion_file_list:
-            self.import_queue.put(file_info.path)
+            self.import_queue.put(file_info.file_path)
 
     def _determine_output_extension(self):
         """
@@ -72,9 +71,9 @@ class ConversionManager:
         If output extension is not already set in settings, prompts user to select
         one. Validates that output format differs from input format.
         """
-        if not self.file_manager.settings.output_ext:
+        if not self.file_manager.settings.supplied_output_ext:
             prompt_for_output_format(
-                self.file_manager.settings.input_ext,
+                self.file_manager.settings.supplied_input_ext,
                 ALIAS_TO_EXTENSION_MAP,
                 self.file_manager.settings.InputOutputFlags,
             )

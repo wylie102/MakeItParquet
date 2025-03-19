@@ -31,8 +31,8 @@ def test_settings_initialisation(mock_settings: Settings, mock_args):
     assert mock_settings.args == mock_args
     assert mock_settings.logger is not None
     assert mock_settings.input_output_flags is not None
-    assert mock_settings.input_ext is None
-    assert mock_settings.output_ext is None
+    assert mock_settings.supplied_input_ext is None
+    assert mock_settings.supplied_output_ext is None
     assert mock_settings.path == mock_args.input_path.resolve()
     assert mock_settings.stat is not None
     assert mock_settings.file_or_dir is not None

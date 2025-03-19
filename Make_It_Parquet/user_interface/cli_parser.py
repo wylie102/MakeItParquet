@@ -11,7 +11,7 @@ from ..extension_mapping import ALIAS_TO_EXTENSION_MAP
 class CLIArgs:
     """A dataclass to ensure correct typing of command line arguments"""
 
-    input_path: Path
+    input_path: Path | None
     output_path: Path | None
     input_format: str | None
     output_format: str | None
@@ -60,20 +60,9 @@ def parse_cli_arguments() -> CLIArgs:
         help="Set the logging level (e.g., DEBUG, INFO, WARNING)",
         default="INFO",
     )
-
+    args = CLIArgs(None, None, None, None, None, None, None)
     # Parse arguments and create argparse.Namespace object (args).
-    args = parser.parse_args()
-
-    # asign args to CLIArgs
-    return CLIArgs(
-        input_path=args.input_path,  # pyright: ignore[reportAny]
-        output_path=args.output_path,  # pyright: ignore[reportAny]
-        input_format=args.input_format,  # pyright: ignore[reportAny]
-        output_format=args.output_format,  # pyright: ignore[reportAny]
-        excel_sheet=args.excel_sheet,  # pyright: ignore[reportAny]
-        excel_range=args.excel_range,  # pyright: ignore[reportAny]
-        log_level=args.log_level,  # pyright: ignore[reportAny]
-    )
+    return parser.parse_args(namespace=args)
 
 
 def _check_format_supported(format: str) -> bool:
@@ -131,7 +120,7 @@ def _input_output_extensions_same(
 
 
 def get_input_output_extensions(
-    args: CLIArgs, input_output_flags: "InputOutputFlags"
+    input_format: str | None, output_format: str | None
 ) -> tuple[str | None, str | None]:
     """
     Validate input and output format arguments that were passed in directly from the command line.
@@ -141,73 +130,13 @@ def get_input_output_extensions(
     Returns:
         Tuple[Optional[str], Optional[str]]: Validated input and output extensions
     """
-    input_ext = _validate_format(args.input_format)
-    output_ext = _validate_format(args.output_format)
+    input_ext = _validate_format(input_format)
+    output_ext = _validate_format(output_format)
     # If supplied extensions are the same, set them to None.
     # Input will now be detected automatically.
     # Output will be supplied via user prompt as part of the main program.
-    # TODO: 16-Feb-2025: Check if this is the best approach.
     if _input_output_extensions_same(input_ext, output_ext):
         input_ext = None
         output_ext = None
-    # Set flags.
-    input_output_flags.set_flags("cli", input_ext, output_ext)
     # Return input and output extensions.
     return input_ext, output_ext
-
-
-class InputOutputFlags:
-    """
-    Flags class for managing flags.
-    """
-
-    def __init__(self):
-        # Flags for input and output extensions.
-        ## CLI flags.
-        self.input_ext_supplied_from_cli: int = 0
-        self.output_ext_supplied_from_cli: int = 0
-        ## Auto-detected flag.
-        self.input_ext_auto_detected: int = 0
-        ## Prompt flags.
-        self.output_ext_supplied_from_prompt: int = 0
-        self.input_ext_supplied_from_prompt: int = 0
-
-    def set_flags(
-        self, environment: str, input_ext: str | None, output_ext: str | None
-    ):
-        """
-        Set the flags based on the environment.
-        """
-        # TODO: 16-Feb-2025: implement functions to appropriately reset other flags.
-        if environment == "cli":
-            self.set_cli_flags(input_ext, output_ext)
-        elif environment == "prompt":
-            self.set_prompt_flags(input_ext, output_ext)
-        elif environment == "auto":
-            self.input_ext_auto_detected = 1
-        else:
-            raise ValueError(f"Invalid environment: {environment}")
-
-    def set_cli_flags(self, input_ext: str | None, output_ext: str | None):
-        """
-        Set the CLI flags.
-        """
-        if input_ext:
-            self.input_ext_supplied_from_cli = 1
-            self.input_ext_auto_detected = 0
-            self.input_ext_supplied_from_prompt = 0
-        if output_ext:
-            self.output_ext_supplied_from_cli = 1
-            self.output_ext_supplied_from_prompt = 0
-
-    def set_prompt_flags(self, input_ext: str | None, output_ext: str | None):
-        """
-        Set the prompt flags.
-        """
-        if input_ext:
-            self.input_ext_supplied_from_prompt = 1
-            self.input_ext_auto_detected = 0
-            self.input_ext_supplied_from_cli = 0
-        if output_ext:
-            self.output_ext_supplied_from_prompt = 1
-            self.output_ext_supplied_from_cli = 0

@@ -12,7 +12,6 @@ from Make_It_Parquet.file_information import (
 )
 from Make_It_Parquet.user_interface.cli_parser import (
     CLIArgs,
-    InputOutputFlags,
     get_input_output_extensions,
 )
 from Make_It_Parquet.user_interface.logger import Logger
@@ -31,18 +30,18 @@ class Settings:
         self.args: CLIArgs = args
         # Logger.
         self.logger: Logger = Logger(self.args.log_level)
-        # Input/output flags.
-        self.input_output_flags: InputOutputFlags = InputOutputFlags()
 
         # get input and output extensions from CLI arguments (if provided).
-        self.input_ext: str | None
-        self.output_ext: str | None
-        self.input_ext, self.output_ext = get_input_output_extensions(
-            self.args, self.input_output_flags
+        self.supplied_input_ext: str | None
+        self.supplied_output_ext: str | None
+        self.supplied_input_ext, self.supplied_output_ext = get_input_output_extensions(
+            self.args.input_format, self.args.output_format
         )
+        self.detected_input_ext: str | None = None
 
         # File information.
-        self.file_info: FileInfo = create_file_info(self.args.input_path)
+        if self.args.input_path:
+            self.file_info: FileInfo = create_file_info(self.args.input_path)
 
         # # Initialise attributes for additional settings.
         # self.excel_settings = None

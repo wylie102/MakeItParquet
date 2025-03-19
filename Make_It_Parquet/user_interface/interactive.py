@@ -1,7 +1,7 @@
 #! /usr/bin/env python3
 import logging
 from pathlib import Path
-from Make_It_Parquet.user_interface.cli_parser import InputOutputFlags
+from Make_It_Parquet.extension_mapping import ALIAS_TO_EXTENSION_MAP
 
 
 def prompt_for_output_format(
@@ -79,7 +79,7 @@ def prompt_for_output_format(
         continue
 
 
-def prompt_for_input_format(ALIAS_TO_EXTENSION_MAP: dict[str, str]):
+def prompt_for_input_format():
     """
     Prompt user for input format.
     """

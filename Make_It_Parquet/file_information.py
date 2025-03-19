@@ -8,7 +8,7 @@ from typing import NamedTuple
 
 
 class FileInfo(NamedTuple):
-    path: Path
+    file_path: Path
     stat_obj: os.stat_result
     file_name: str
     file_size: int

@@ -15,20 +15,17 @@ The managers handle:
 
 import os
 from collections import defaultdict
-from pathlib import Path
 from typing import override
 
 
-from Make_It_Parquet.extension_mapping import (
-    ALIAS_TO_EXTENSION_MAP,
-    ALLOWED_FILE_EXTENSIONS,
-)
+from Make_It_Parquet.extension_mapping import ALLOWED_FILE_EXTENSIONS
 from Make_It_Parquet.file_information import FileInfo, create_file_info
 from Make_It_Parquet.user_interface.interactive import prompt_for_input_format
 
 TYPE_CHECKING = False
 if TYPE_CHECKING:
     from Make_It_Parquet.user_interface.settings import Settings
+    from pathlib import Path
 
 
 class FileManager:
@@ -46,10 +43,11 @@ class FileManager:
         # Store file information.
         self.file_info: FileInfo = self.settings.file_info
 
-        # Store parsed CLI arguments by copying from Settings.
-        self.input_path: Path = self.file_info.path
-        self.input_ext: str | None = self.settings.input_ext
-        self.output_ext: str | None = self.settings.output_ext
+        # Store input path.
+        self.input_path: Path = self.file_info.file_path
+
+        # Initialize input_ext
+        self.input_ext: str
 
         # Initialize conversion file list.
         self.conversion_file_list: list[FileInfo] = []
@@ -71,8 +69,11 @@ class FileManager:
             SystemExit: If file extension is not in the ALLOWED_FILE_EXTENSIONS.
         """
         # Determine the input extension.
-        if not self.input_ext:
-            self.input_ext = self.file_info.file_extension
+        if not self.settings.supplied_input_ext:
+            self.settings.detected_input_ext = self.file_info.file_extension
+            self.input_ext = self.settings.detected_input_ext
+        else:
+            self.input_ext = self.settings.supplied_input_ext
 
         if (
             self.input_ext not in ALLOWED_FILE_EXTENSIONS
@@ -83,8 +84,7 @@ class FileManager:
 
     def _set_conversion_file_list(self):
         """sets conversion file dict list in same format as that used in directory manager."""
-        if self.input_ext:  # Ensure input_ext is not None
-            self.conversion_file_list.append(self.file_info)
+        self.conversion_file_list.append(self.file_info)
 
 
 class DirectoryManager(FileManager):
@@ -109,9 +109,22 @@ class DirectoryManager(FileManager):
 
     @override
     def analyze_files(self):
-        self._get_extension_file_groups()  # creates dir_file_list, groups files into extension_file_groups, totals extension_counts.
-        self._detect_majority_extension()  # detects majority extension, sets self.input_ext, sets conversion_file_list, updates flags.
-        self._order_files_by_size()
+        """
+        Scans directory to generate file groups based on file extension.
+        Assigns input_ext, either by detection or from passed argument.
+        Assigns conversion file list based of input_ext.
+        """
+        # get file groups
+        self._get_extension_file_groups()
+
+        # If input_ext not passed by user then detect majority ext. Asign extension to self.input_ext.
+        if not self.settings.supplied_input_ext:
+            self._detect_majority_extension()  # detects majority extension, sets self.input_ext, sets conversion_file_list, updates flags.
+        else:
+            self.input_ext: str = self.settings.supplied_input_ext
+
+        # Set converstion file list.
+        self._set_file_list()
 
     def _get_extension_file_groups(self):
         """
@@ -153,10 +166,9 @@ class DirectoryManager(FileManager):
 
         # If no majority file format then prompt user for input format
         if self._no_clear_majority_file_format():
-            prompt_for_input_format(
-                ALIAS_TO_EXTENSION_MAP
-            )  # TODO: check why this is being passed in as an argument
-        self._set_input_extension_and_file_list()
+            prompt_for_input_format()
+        self.settings.detected_input_ext = list(self.extension_counts.keys())[0]
+        self.input_ext = self.settings.detected_input_ext
 
     def _sort_extensions_by_count(self):
         """Sort the extensions by the number of files in each group."""
@@ -177,10 +189,8 @@ class DirectoryManager(FileManager):
                 return True
         return False
 
-    def _set_input_extension_and_file_list(self):
+    def _set_file_list(self):
         """Set input extension and file list. Also updates flags."""
-        self.input_ext: str | None = list(self.extension_counts.keys())[0]
-        self.settings.input_output_flags.set_flags("auto", self.input_ext, None)
         self.conversion_file_list = self.extension_file_groups[self.input_ext]
         self._order_files_by_size()
 

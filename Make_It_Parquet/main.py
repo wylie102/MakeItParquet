@@ -42,12 +42,12 @@ def main() -> None:
     args: CLIArgs = parse_cli_arguments()
     settings: Settings = Settings(args)
 
-    # Create FileManager and ConversionManager instances to manage conversion and file naming processes.
+    # Create FileManager and analyze files.
     file_manager: FileManager | DirectoryManager = create_file_manager(settings)
-    file_manager.analyze_files()
-    conversion_manager: ConversionManager = ConversionManager(file_manager)
+    file_manager.get_conversion_list()
 
     # Trigger conversion process.
+    conversion_manager: ConversionManager = ConversionManager(file_manager)
     conversion_manager.run_conversion()  # TODO: This function call is a placeholder. Create a function which starts the conversion process and run it, may be two functions, one in file manager and another in conversion manager.
 
     # End program and ensure correct cleanup.

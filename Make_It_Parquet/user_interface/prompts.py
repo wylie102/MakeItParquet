@@ -2,13 +2,10 @@
 import logging
 from pathlib import Path
 from Make_It_Parquet.extension_mapping import ALIAS_TO_EXTENSION_MAP
+from Make_It_Parquet.user_interface.settings import Settings
 
 
-def prompt_for_output_format(
-    input_ext: str,
-    ALIAS_TO_EXTENSION_MAP: dict[str, str],
-    input_output_flags: InputOutputFlags,
-):
+def prompt_for_output_format(input_ext: str, settings: Settings):
     """
     Prompt user for output format, ensuring it differs from input.
 
@@ -40,10 +37,7 @@ def prompt_for_output_format(
         ):
             output_ext = ALIAS_TO_EXTENSION_MAP[output_format]
             ## Input extension was automatically detected.
-            if (
-                input_output_flags.input_ext_supplied_from_cli == 0
-                and input_output_flags.input_ext_auto_detected == 1
-            ):
+            if not settings.supplied_input_ext and settings.detected_input_ext:
                 logging.error(
                     f"Conflict detected: Output format '{output_ext}' is the same as the auto-detected input format '{input_ext}'."
                 )
@@ -52,7 +46,7 @@ def prompt_for_output_format(
                 )
                 # Wishes to change from detected input extension.
                 if input_answer.lower() == "y":
-                    prompt_for_input_format(ALIAS_TO_EXTENSION_MAP)
+                    prompt_for_input_format()
                 # Wishes to keep detected input extension.
                 else:
                     logging.info("Please enter a different output format.")
@@ -67,7 +61,7 @@ def prompt_for_output_format(
                 )
                 # Wishes to change from passed in input extension.
                 if input_answer.lower() == "y":
-                    prompt_for_input_format(ALIAS_TO_EXTENSION_MAP)
+                    prompt_for_input_format()
                 # Wishes to keep passed in input extension.
                 else:
                     logging.info("Please enter a different output format.")

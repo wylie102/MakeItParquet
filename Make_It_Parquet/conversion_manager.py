@@ -6,7 +6,7 @@ import os
 import uuid
 import tempfile
 import duckdb
-from Make_It_Parquet.user_interface.interactive import prompt_for_output_format
+from Make_It_Parquet.user_interface.prompts import prompt_for_output_format
 from .extension_mapping import (
     ALIAS_TO_EXTENSION_MAP,
 )
@@ -90,8 +90,6 @@ class ConversionManager:
         Raises:
             duckdb.Error: If the import operation fails
         """
-        table_name = self._generate_table_name(file_path)
-        import_sql = f"CREATE TABLE {table_name} AS SELECT * FROM read_csv_auto('{file_path}')"  # TODO: this needs to call correct import class for the file ext.
         _ = self.conn.execute(import_sql)
         return table_name
 

@@ -20,7 +20,7 @@ from typing import override
 
 from Make_It_Parquet.extension_mapping import ALLOWED_FILE_EXTENSIONS
 from Make_It_Parquet.file_information import FileInfo, create_file_info
-from Make_It_Parquet.user_interface.interactive import prompt_for_input_format
+from Make_It_Parquet.user_interface.prompts import prompt_for_input_format
 
 TYPE_CHECKING = False
 if TYPE_CHECKING:
@@ -37,27 +37,20 @@ class FileManager:
         """
         Initialize the conversion manager.
         """
-        # Attach Settings instance to the conversion manager.
+        # Attach Settings and input_path
         self.settings: Settings = settings
+        self.input_path: Path = self.settings.file_info.file_path
 
-        # Store file information.
-        self.file_info: FileInfo = self.settings.file_info
-
-        # Store input path.
-        self.input_path: Path = self.file_info.file_path
-
-        # Initialize input_ext
+        # Initialize input_ext and conversion file list
         self.input_ext: str
-
-        # Initialize conversion file list.
         self.conversion_file_list: list[FileInfo] = []
 
-    def analyze_files(self) -> None:
+    def get_conversion_list(self) -> None:
         # Check input extension and generate conversion file list.
-        self._check_input_extension()
+        self._get_input_extension()
         self._set_conversion_file_list()
 
-    def _check_input_extension(self):
+    def _get_input_extension(self):
         """
         Validate the input file extension.
 
@@ -70,7 +63,7 @@ class FileManager:
         """
         # Determine the input extension.
         if not self.settings.supplied_input_ext:
-            self.settings.detected_input_ext = self.file_info.file_extension
+            self.settings.detected_input_ext = self.settings.file_info.file_extension
             self.input_ext = self.settings.detected_input_ext
         else:
             self.input_ext = self.settings.supplied_input_ext
@@ -84,7 +77,7 @@ class FileManager:
 
     def _set_conversion_file_list(self):
         """sets conversion file dict list in same format as that used in directory manager."""
-        self.conversion_file_list.append(self.file_info)
+        self.conversion_file_list.append(self.settings.file_info)
 
 
 class DirectoryManager(FileManager):
@@ -100,53 +93,62 @@ class DirectoryManager(FileManager):
     def __init__(self, settings: Settings):
         super().__init__(settings)
 
-        # initialize directory conversion attributes.
-        self.dir_file_list: list[FileInfo] = []
+        # Initialize file group attributes
         self.extension_file_groups: dict[str, list[FileInfo]] = defaultdict(list)
         self.extension_counts: dict[str, int] = defaultdict(int)
-        self.conversion_file_list: list[FileInfo] = []
-        self.analyze_files()  # TODO: maybe make this more elegant, perhaps with a data class.
 
-    @override
-    def analyze_files(self):
-        """
-        Scans directory to generate file groups based on file extension.
-        Assigns input_ext, either by detection or from passed argument.
-        Assigns conversion file list based of input_ext.
-        """
         # get file groups
         self._get_extension_file_groups()
 
-        # If input_ext not passed by user then detect majority ext. Asign extension to self.input_ext.
+    @override
+    def _get_input_extension(self):
         if not self.settings.supplied_input_ext:
-            self._detect_majority_extension()  # detects majority extension, sets self.input_ext, sets conversion_file_list, updates flags.
+            self._detect_majority_extension()
         else:
             self.input_ext: str = self.settings.supplied_input_ext
 
-        # Set converstion file list.
-        self._set_file_list()
+    @override
+    def _set_conversion_file_list(self):
+        """Set input extension and file list. Also updates flags."""
+        self.conversion_file_list: list[FileInfo] = self.extension_file_groups[
+            self.input_ext
+        ]
+        self._order_files_by_size()
+
+    def _order_files_by_size(self):
+        """
+        Sort the file dictionary by file size.
+
+        Orders files from smallest to largest to optimize processing.
+        """
+        self.conversion_file_list.sort(
+            key=lambda x: x.file_size,
+            reverse=True,
+        )
 
     def _get_extension_file_groups(self):
         """
         Generate information about files in the directory.
         Scans the directory for files matching the allowed extensions and groups them by extension.
         """
-        self._create_list_of_file_info_dicts()
-        self._group_files_by_extension()
+        info_dicts_list: list[FileInfo] = self._create_list_of_file_info_dicts()
+        self._group_files_by_extension(info_dicts_list)
         self._exit_if_no_files()
 
-    def _create_list_of_file_info_dicts(self):
+    def _create_list_of_file_info_dicts(self) -> list[FileInfo]:
         """Create a list of file information dictionaries from the directory."""
+        file_info_list: list[FileInfo] = []
         with os.scandir(self.input_path) as entries:
             for entry in entries:
                 if entry.is_file():
                     file_info: FileInfo = create_file_info(entry)
-                    self.dir_file_list.append(file_info)
+                    file_info_list.append(file_info)
+        return file_info_list
 
-    def _group_files_by_extension(self):
+    def _group_files_by_extension(self, info_dicts_list: list[FileInfo]):
         """Group files by extension and count the number of files for each extension."""
-        for file_info in self.dir_file_list:
-            ext = file_info.file_extension
+        for file_info in info_dicts_list:
+            ext: str = file_info.file_extension
             if ext in ALLOWED_FILE_EXTENSIONS:
                 self.extension_file_groups[ext].append(file_info)
                 self.extension_counts[ext] += 1
@@ -188,19 +190,3 @@ class DirectoryManager(FileManager):
                 )
                 return True
         return False
-
-    def _set_file_list(self):
-        """Set input extension and file list. Also updates flags."""
-        self.conversion_file_list = self.extension_file_groups[self.input_ext]
-        self._order_files_by_size()
-
-    def _order_files_by_size(self):
-        """
-        Sort the file dictionary by file size.
-
-        Orders files from smallest to largest to optimize processing.
-        """
-        self.conversion_file_list.sort(
-            key=lambda x: x.file_size,
-            reverse=True,
-        )

@@ -6,7 +6,7 @@ import os
 import uuid
 import tempfile
 import duckdb
-from Make_It_Parquet.user_interface.prompts import prompt_for_output_format
+from Make_It_Parquet.user_interface.prompts import prompt_for_output_extension
 from .extension_mapping import (
     ALIAS_TO_EXTENSION_MAP,
 )
@@ -72,7 +72,7 @@ class ConversionManager:
         one. Validates that output format differs from input format.
         """
         if not self.file_manager.settings.supplied_output_ext:
-            prompt_for_output_format(
+            prompt_for_output_extension(
                 self.file_manager.settings.supplied_input_ext,
                 ALIAS_TO_EXTENSION_MAP,
                 self.file_manager.settings.InputOutputFlags,

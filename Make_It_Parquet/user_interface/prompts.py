@@ -2,10 +2,13 @@
 import logging
 from pathlib import Path
 from Make_It_Parquet.extension_mapping import ALIAS_TO_EXTENSION_MAP
-from Make_It_Parquet.user_interface.settings import Settings
+
+TYPE_CHECKING = False
+if TYPE_CHECKING:
+    from Make_It_Parquet.user_interface.settings import Settings
 
 
-def prompt_for_output_format(input_ext: str, settings: Settings):
+def prompt_for_output_extension(input_ext: str, settings: Settings):
     """
     Prompt user for output format, ensuring it differs from input.
 
@@ -13,87 +16,93 @@ def prompt_for_output_format(input_ext: str, settings: Settings):
         str: Validated output extension
     """
     while True:
-        # Prompt for output format.
-        output_format = (
-            input(
-                "Enter desired output format (csv, tsv, txt, parquet(pq), json(js), excel(ex)): "
-            )
-            .strip()
-            .lower()
-        )
-        # Validate user input.
-        ## Output extension is valid and different from input extension.
-        if (
-            output_format in ALIAS_TO_EXTENSION_MAP
-            and ALIAS_TO_EXTENSION_MAP[output_format] != input_ext
-        ):
-            output_ext = ALIAS_TO_EXTENSION_MAP[output_format]
-            logging.info(f"Output format set to: {output_ext}")
-            break
+        # get output_extension
+        output_ext = _get_extension()
+
         ## Output extension is valid but the same as input extension.
-        elif (
-            output_format in ALIAS_TO_EXTENSION_MAP
-            and ALIAS_TO_EXTENSION_MAP[output_format] == input_ext
-        ):
-            output_ext = ALIAS_TO_EXTENSION_MAP[output_format]
-            ## Input extension was automatically detected.
-            if not settings.supplied_input_ext and settings.detected_input_ext:
-                logging.error(
-                    f"Conflict detected: Output format '{output_ext}' is the same as the auto-detected input format '{input_ext}'."
-                )
-                input_answer = input(
-                    "The input format was auto-detected. Would you like to change the from the detected input format? (y/n): "
-                )
-                # Wishes to change from detected input extension.
-                if input_answer.lower() == "y":
-                    prompt_for_input_format()
-                # Wishes to keep detected input extension.
-                else:
-                    logging.info("Please enter a different output format.")
-                    continue
-            ## Input extension was passed in directly.
-            else:
-                logging.error(
-                    f"Conflict detected: Output format '{output_ext}' is the same as the user-provided input format '{input_ext}'."
-                )
-                input_answer = input(
-                    "The input format was provided directly. Would you like to change the input format? (y/n): "
-                )
-                # Wishes to change from passed in input extension.
-                if input_answer.lower() == "y":
-                    prompt_for_input_format()
-                # Wishes to keep passed in input extension.
-                else:
-                    logging.info("Please enter a different output format.")
-                    continue
+        if output_ext == input_ext:
+            ## If input extension was automatically detected.
+            _offer_chance_to_change_input_ext(input_ext, output_ext, settings)
+            continue
+
+        return output_ext
+
+
+def _get_extension() -> str:
+    while True:
+        # Prompt for output format.
+        output_format = _prompt_user_for_format()
+
+        # Validate user input.
+        ## If format is valid, return extension.
+        output_ext = _check_format_return_extension(output_format)
+        if not output_ext:
+            continue
+        return output_ext
+
+
+def _prompt_user_for_format() -> str:
+    output_format = (
+        input(
+            "Enter desired output format (csv, tsv, txt, parquet(pq), json(js), excel(ex)): "
+        )
+        .strip()
+        .lower()
+    )
+    return output_format
+
+
+def _check_format_return_extension(output_format: str) -> str | None:
+    if output_format in ALIAS_TO_EXTENSION_MAP:
+        output_ext = ALIAS_TO_EXTENSION_MAP[output_format]
+        return output_ext
+    else:
+        logging.error(
+            "Invalid output format. Please enter a valid output format (note: formats do not include the '.' ."
+        )
+
+
+def _offer_chance_to_change_input_ext(
+    input_ext: str, output_ext: str, settings: Settings
+) -> None:
+    if settings.detected_input_ext and not settings.supplied_input_ext:
+        method = "automatically detected"
+    else:
+        method = "user-provided"
+
+        logging.error(
+            f"""Conflict detected:\n
+            Output extension '{output_ext}' is the same as the {method} input extension '{input_ext}'.\n
+            Would you like to change the from the detected input format?"""
+        )
+        # Wishes to change from detected input extension.
+        if _yes_no_bool():
+            prompt_for_input_extension(file_manager)
+        # Wishes to keep detected input extension.
         else:
-            logging.error(
-                "Invalid output format. Please enter a valid output format (note: formats do not include the '.' ."
-            )
-        continue
+            logging.info("Please enter a different output format.")
 
 
-def prompt_for_input_format():
+def _yes_no_bool():
+    while True:
+        answer = input("(y/n): ").strip().lower()
+        if answer == "y":
+            return True
+        elif answer == "n":
+            return False
+        else:
+            logging.error("Invalid response. Please enter: 'y/n'")
+            continue
+
+
+def prompt_for_input_extension(settings: Settings):
     """
     Prompt user for input format.
     """
-    while True:
-        input_format = (
-            input(
-                "Enter desired input format (csv, tsv, txt, parquet(pq), json(js), excel(ex)): "
-            )
-            .strip()
-            .lower()
-        )
-        if input_format in ALIAS_TO_EXTENSION_MAP:
-            input_ext = ALIAS_TO_EXTENSION_MAP[input_format]
-            logging.info(f"Input extension set to: {input_ext}")
-            break
-        else:
-            logging.error(
-                "Invalid input format. Please enter a valid input format (note: formats do not include the '.' ."
-            )
-            continue
+    input_ext: str = _get_extension()
+    settings.update_input_ext(input_ext, "supplied")
+    file_manager.input_ext = input_ext
+    logging.info(f"Input extension set to: {input_ext}")
 
 
 def get_delimiter(

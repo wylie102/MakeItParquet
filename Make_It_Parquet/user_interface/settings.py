@@ -6,6 +6,8 @@ This module contains the Settings class, which is responsible for managing and s
 Additionally, the InputOutputFlags class is used to manage flags related to how the input/output extensions are determined (e.g., from CLI arguments, auto-detected, or prompted).
 """
 
+import logging
+from Make_It_Parquet.extension_mapping import ALLOWED_FILE_EXTENSIONS
 from Make_It_Parquet.file_information import (
     FileInfo,
     create_file_info,
@@ -21,6 +23,23 @@ class Settings:
     """
     Settings class for managing application configuration.
     """
+
+    def update_input_ext(self, input_ext: str, method: str) -> None:
+        if input_ext in ALLOWED_FILE_EXTENSIONS:
+            if method == "detected":
+                self.detected_input_ext = input_ext
+                self.supplied_input_ext = None
+            elif method == "supplied":
+                self.supplied_input_ext = input_ext
+                self.detected_input_ext = None
+            else:
+                logging.error("Unable to update input ext, method is invalid")
+        else:
+            logging.error("Unable to update input ext, supplied extension is invalid.")
+
+    def update_output_ext(self, output_ext: str) -> None:
+        if output_ext in ALLOWED_FILE_EXTENSIONS:
+            self.supplied_output_ext = output_ext
 
     def __init__(self, args: CLIArgs) -> None:
         """

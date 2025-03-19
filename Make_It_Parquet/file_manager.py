@@ -20,7 +20,7 @@ from typing import override
 
 from Make_It_Parquet.extension_mapping import ALLOWED_FILE_EXTENSIONS
 from Make_It_Parquet.file_information import FileInfo, create_file_info
-from Make_It_Parquet.user_interface.prompts import prompt_for_input_format
+from Make_It_Parquet.user_interface.prompts import prompt_for_input_extension
 
 TYPE_CHECKING = False
 if TYPE_CHECKING:
@@ -168,7 +168,7 @@ class DirectoryManager(FileManager):
 
         # If no majority file format then prompt user for input format
         if self._no_clear_majority_file_format():
-            prompt_for_input_format()
+            prompt_for_input_extension()
         self.settings.detected_input_ext = list(self.extension_counts.keys())[0]
         self.input_ext = self.settings.detected_input_ext
 
@@ -190,3 +190,6 @@ class DirectoryManager(FileManager):
                 )
                 return True
         return False
+
+    def set_input_extension(self, input_ext: str) -> None:
+        self.input_ext = input_ext

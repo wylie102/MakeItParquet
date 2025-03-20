@@ -3,6 +3,7 @@
 
 from queue import Queue
 import os
+import time
 import uuid
 import tempfile
 import duckdb
@@ -102,6 +103,19 @@ class ConversionManager:
             # releasses process to check queue again.
             self.import_queue.task_done()
 
+        if self.pending_exports:
+            start_time = time.time()
+            while True:
+                if self.output_ext:
+                    break
+                if time.time() - start_time > 300:
+                    self.close_connection(True)
+                    self.file_manager.settings.exit_program(
+                        "No input for 5 minutes. Exiting program."
+                    )
+                time.sleep(0.01)
+                continue
+            self._process_pending_exports()
         # Shut down connection and clean up temp files.
         self.close_connection(True)
 
@@ -111,14 +125,13 @@ class ConversionManager:
         _ = self.conn.execute(conversion_data.import_attributes.import_query)
         return conversion_data
 
-    def _prepare_for_export(self):
+    def prepare_for_export(self):
         self._determine_output_extension()
         if self.output_ext:
             if self.file_manager.input_ext:
                 export_attributes = ConversionData.generate_export_attributes(
                     self.file_info, self.file_manager.input_ext, self.output_ext
                 )
-                self._store_prepared_export_statement(export_attributes)
                 self.export_attributes = export_attributes
 
     def _determine_output_extension(self):
@@ -143,6 +156,8 @@ class ConversionManager:
 
     def _process_pending_exports(self) -> None:
         """Processes all pending exports in order."""
+        self._store_prepared_export_statement(self.export_attributes)
+        self.export_attributes.output_directory_path.mkdir(exist_ok=True, parents=True)
         for conversion_data in self.pending_exports:
             self._export_file(conversion_data)
 

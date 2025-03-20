@@ -1,4 +1,4 @@
-#!/usr/bin/env python3 --script
+#!/usr/bin/env uv run
 # /// script
 # dependencies = [
 #     "duckdb",
@@ -48,6 +48,7 @@ def main() -> None:
 
     # Trigger conversion process.
     conversion_manager: ConversionManager = ConversionManager(file_manager)
+    conversion_manager.prepare_for_export()
     conversion_manager.run_conversion()
 
     # End program and ensure correct cleanup.

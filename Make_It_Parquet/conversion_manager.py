@@ -6,7 +6,7 @@ import os
 import uuid
 import tempfile
 import duckdb
-from Make_It_Parquet.conversion_data import ConversionData
+from Make_It_Parquet.conversion_data import ConversionData, ExportAttributes
 from Make_It_Parquet.user_interface.prompts import prompt_for_output_extension
 
 TYPE_CHECKING = False
@@ -41,18 +41,19 @@ class ConversionManager:
             file_manager: BaseFileManager instance containing conversion settings
                 and file list information
         """
+        self.file_manager: FileManager | DirectoryManager = file_manager
+        self.file_info: FileInfo = self.file_manager.settings.file_info
+        self.output_ext: str | None = file_manager.settings.master_output_ext
+        self.export_attributes: ExportAttributes
         self.db_path: str = os.path.join(
             tempfile.gettempdir(), f"make_it_parquet_{uuid.uuid4()}.db"
         )
         self.conn: duckdb.DuckDBPyConnection = duckdb.connect(database=self.db_path)  # pyright: ignore[reportUnknownMemberType]
-        self.file_manager: FileManager | DirectoryManager = file_manager
         self.import_queue: Queue[FileInfo] = Queue()
         self.pending_exports: list[ConversionData] = []
-        self.one_in_one_out: bool = (
-            self.file_manager.settings.supplied_output_ext is not None
-        )
+        self.one_in_one_out: bool = self.output_ext is not None
 
-        if self.file_manager.input_ext:
+        if self.file_manager.input_ext:  # TODO: probably move into run_conversion
             self._store_prepared_import_statement(self.file_manager.input_ext)
         self._populate_import_queue(file_manager.conversion_file_list)
 
@@ -70,8 +71,6 @@ class ConversionManager:
         """
         for file_info in conversion_file_list:
             self.import_queue.put(file_info)
-
-    
 
     def run_conversion(self) -> None:
         """Processes files from the import queue.
@@ -92,11 +91,7 @@ class ConversionManager:
                 # add last file to pending_exports
                 self.pending_exports.append(conversion_data)
                 # If output extension is now set, process all pending files
-                if self.file_manager.settings.supplied_output_ext:
-                    # Store the prepared export statement
-                    self._store_prepared_export_statement(
-                        self.file_manager.settings.supplied_output_ext
-                    )
+                if self.output_ext:
                     self._process_pending_exports()
                     self.one_in_one_out = True
 
@@ -111,12 +106,20 @@ class ConversionManager:
         self.close_connection(True)
 
     def _import_file(self) -> ConversionData:
-            file_info = self.import_queue.get()
-            conversion_data = ConversionData(
-                file_info.file_ext, file_info.file_path
-            )
-            _ = self.conn.execute(conversion_data.import_attributes.import_query)
-            return conversion_data
+        file_info = self.import_queue.get()
+        conversion_data = ConversionData(file_info.file_ext, file_info.file_path)
+        _ = self.conn.execute(conversion_data.import_attributes.import_query)
+        return conversion_data
+
+    def _prepare_for_export(self):
+        self._determine_output_extension()
+        if self.output_ext:
+            if self.file_manager.input_ext:
+                export_attributes = ConversionData.generate_export_attributes(
+                    self.file_info, self.file_manager.input_ext, self.output_ext
+                )
+                self._store_prepared_export_statement(export_attributes)
+                self.export_attributes = export_attributes
 
     def _determine_output_extension(self):
         """
@@ -125,17 +128,18 @@ class ConversionManager:
         If output extension is not already set in settings, prompts user to select
         one. Validates that output format differs from input format.
         """
-        if not self.file_manager.settings.supplied_output_ext:
+        if not self.output_ext:
             if self.file_manager.input_ext:
                 prompt_for_output_extension(
                     self.file_manager.input_ext, self.file_manager.settings
                 )
 
-    def _store_prepared_export_statement(self, output_ext: str) -> None:
+    def _store_prepared_export_statement(
+        self, export_attributes: ExportAttributes
+    ) -> None:
         # Store prepared statement in duckdb database.
-        _ = self.conn.execute(
-            ConversionData.generate_prepared_export_statement(output_ext)
-        )
+        export_statement = export_attributes.prepared_export_statement
+        _ = self.conn.execute(export_statement)
 
     def _process_pending_exports(self) -> None:
         """Processes all pending exports in order."""
@@ -155,22 +159,19 @@ class ConversionManager:
         self._log_conversion(conversion_data)
 
     def _export_table(self, conversion_data: ConversionData) -> None:
-        export_statement: str = (
-            conversion_data.export_attributes.generate_export_statement
-        )
-        _ = self.conn.execute(export_statement)    self.pending_exports.clear()
+        export_query = conversion_data.generate_export_query(self.export_attributes)
+        _ = self.conn.execute(export_query)
 
     def _drop_table(self, conversion_data: ConversionData):
-            drop_statement: str = conversion_data.import_attributes.table_name
-            _ = self.conn.execute(f"DROP TABLE {drop_statement}")
+        drop_statement: str = conversion_data.import_attributes.table_name
+        _ = self.conn.execute(f"DROP TABLE {drop_statement}")
 
     def _log_conversion(self, conversion_data: ConversionData):
-            import_file: str = conversion_data.import_attributes.file_path.name
-            export_file: str = conversion_data.export_attributes.file_path.name
-            self.file_manager.settings.logger.info(
-                f"File {import_file} successfully converted to {export_file}"
-            )
-
+        import_file: str = conversion_data.import_attributes.file_path.name
+        export_file: str = conversion_data.output_path.name
+        self.file_manager.settings.logger.info(
+            f"File {import_file} successfully converted to {export_file}"
+        )
 
     def close_connection(self, cleanup_db_file: bool = False) -> None:
         """Closes the DuckDB connection and optionally removes the DB file.

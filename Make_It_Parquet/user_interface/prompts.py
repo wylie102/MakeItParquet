@@ -25,7 +25,7 @@ def prompt_for_output_extension(input_ext: str, settings: Settings):
             _offer_chance_to_change_input_ext(input_ext, output_ext, settings)
             continue
 
-        settings.supplied_output_ext = output_ext
+        settings.set_output_ext(output_ext)
         break
 
 
@@ -103,7 +103,7 @@ def prompt_for_input_extension(settings: Settings):
     Prompt user for input format.
     """
     input_ext: str = _get_extension()
-    settings.update_input_ext(input_ext, "supplied")
+    settings.set_input_ext(input_ext, "supplied")
     logging.info(f"Input extension set to: {input_ext}")
 
 

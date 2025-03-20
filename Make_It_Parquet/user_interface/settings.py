@@ -66,7 +66,7 @@ class Settings:
         self.logger.stop_logging()
         exit(1)  # TODO: look at deleting any converted files etc. if needed.
 
-    def update_input_ext(self, input_ext: str, method: str) -> None:
+    def set_input_ext(self, input_ext: str, method: str) -> None:
         if input_ext in ALLOWED_FILE_EXTENSIONS:
             if method == "detected":
                 self.detected_input_ext = input_ext
@@ -79,7 +79,7 @@ class Settings:
         else:
             logging.error("Unable to update input ext, supplied extension is invalid.")
 
-    def update_output_ext(self, output_ext: str) -> None:
+    def set_output_ext(self, output_ext: str) -> None:
         if output_ext in ALLOWED_FILE_EXTENSIONS:
             self.supplied_output_ext = output_ext
 
@@ -100,3 +100,7 @@ class Settings:
                         self.detected_input_ext
                     }' and supplied input extension: '{self.supplied_output_ext}'."
                 )
+
+    @property
+    def master_output_ext(self) -> str | None:
+        return self.supplied_output_ext

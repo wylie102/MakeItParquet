@@ -48,7 +48,7 @@ def main() -> None:
 
     # Trigger conversion process.
     conversion_manager: ConversionManager = ConversionManager(file_manager)
-    conversion_manager.run_conversion()  # TODO: This function call is a placeholder. Create a function which starts the conversion process and run it, may be two functions, one in file manager and another in conversion manager.
+    conversion_manager.run_conversion()
 
     # End program and ensure correct cleanup.
     settings.exit_program("Conversion complete.")

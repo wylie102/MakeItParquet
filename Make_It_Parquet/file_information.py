@@ -12,7 +12,7 @@ class FileInfo(NamedTuple):
     stat_obj: os.stat_result
     file_name: str
     file_size: int
-    file_extension: str
+    file_ext: str
     file_or_directory: str
 
 

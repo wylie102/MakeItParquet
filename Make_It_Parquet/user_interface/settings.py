@@ -24,23 +24,6 @@ class Settings:
     Settings class for managing application configuration.
     """
 
-    def update_input_ext(self, input_ext: str, method: str) -> None:
-        if input_ext in ALLOWED_FILE_EXTENSIONS:
-            if method == "detected":
-                self.detected_input_ext = input_ext
-                self.supplied_input_ext = None
-            elif method == "supplied":
-                self.supplied_input_ext = input_ext
-                self.detected_input_ext = None
-            else:
-                logging.error("Unable to update input ext, method is invalid")
-        else:
-            logging.error("Unable to update input ext, supplied extension is invalid.")
-
-    def update_output_ext(self, output_ext: str) -> None:
-        if output_ext in ALLOWED_FILE_EXTENSIONS:
-            self.supplied_output_ext = output_ext
-
     def __init__(self, args: CLIArgs) -> None:
         """
         Initialize the Settings object.
@@ -74,10 +57,46 @@ class Settings:
             message: Error message to log
             error_type: Type of error ('error' or 'exception')
         """
+        message = f"{message} Exiting program."
         if error_type == "error":
             self.logger.error(message)
         elif error_type == "exception":
             self.logger.exception(message)
 
         self.logger.stop_logging()
-        exit(1)
+        exit(1)  # TODO: look at deleting any converted files etc. if needed.
+
+    def update_input_ext(self, input_ext: str, method: str) -> None:
+        if input_ext in ALLOWED_FILE_EXTENSIONS:
+            if method == "detected":
+                self.detected_input_ext = input_ext
+                self.supplied_input_ext = None
+            elif method == "supplied":
+                self.supplied_input_ext = input_ext
+                self.detected_input_ext = None
+            else:
+                logging.error("Unable to update input ext, method is invalid")
+        else:
+            logging.error("Unable to update input ext, supplied extension is invalid.")
+
+    def update_output_ext(self, output_ext: str) -> None:
+        if output_ext in ALLOWED_FILE_EXTENSIONS:
+            self.supplied_output_ext = output_ext
+
+    @property
+    def master_input_ext(self) -> str | None:
+        if self.supplied_input_ext and not self.detected_input_ext:
+            return self.supplied_input_ext
+        elif self.detected_input_ext and not self.supplied_input_ext:
+            return self.detected_input_ext
+        elif not self.supplied_input_ext and not self.detected_input_ext:
+            return None
+        elif self.supplied_input_ext and self.detected_input_ext:
+            if self.supplied_input_ext == self.detected_input_ext:
+                return self.supplied_input_ext
+            elif self.supplied_input_ext != self.detected_input_ext:
+                self.exit_program(
+                    f"Conflict between detected input extension: '{
+                        self.detected_input_ext
+                    }' and supplied input extension: '{self.supplied_output_ext}'."
+                )

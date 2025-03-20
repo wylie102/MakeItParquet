@@ -50,19 +50,40 @@ class ConversionData:
     read_statement_mapping: _SQLReadStatementMapping = _SQLReadStatementMapping()
     default_argument_mapping: _DefaultArgumentMapping = _DefaultArgumentMapping()
 
+    @staticmethod
+    def generate_prepared_import_statement(input_ext: str) -> str:
+        ext_key: str = ConversionData._generate_ext_key(input_ext)
+        read_function: str = ConversionData._generate_read_function(ext_key)
+        default_arguments: str = ConversionData._generate_default_arguments(ext_key)
+        return f"PREPARE import_statement AS CREATE TABLE $table_name AS FROM {
+            read_function
+        }('$file_path'{default_arguments});"
+
+    @staticmethod
+    def _generate_ext_key(input_ext: str) -> str:
+        return re.sub(r"^\.", "", input_ext)
+
+    @staticmethod
+    def _generate_read_function(ext_key: str) -> str:
+        read_statement: str = getattr(ConversionData.read_statement_mapping, ext_key)
+        return read_statement
+
+    @staticmethod
+    def _generate_default_arguments(ext_key: str) -> str:
+        arguments: str = getattr(ConversionData.default_argument_mapping, ext_key)
+        return arguments
+
     def __init__(self, input_ext: str, file_path: Path) -> None:
         """Initializes a ConversionData instance."""
 
         # Normalize the extension: remove a leading dot.
-        ext_key: str = re.sub(r"^\.", "", input_ext)
-        read_function: str = getattr(ConversionData.read_statement_mapping, ext_key)
-        default_arguments: str = getattr(
-            ConversionData.default_argument_mapping, ext_key
-        )
+        ext_key: str = ConversionData._generate_ext_key(input_ext)
+        read_function: str = ConversionData._generate_read_function(ext_key)
+        default_arguments: str = ConversionData._generate_default_arguments(ext_key)
         table_name = self._create_unique_table_name(file_path)
         import_query = self.generate_import_query(table_name, file_path)
 
-        self.input_attributes: ConversionInputAttributes = ConversionInputAttributes(
+        self.import_attributes: ConversionInputAttributes = ConversionInputAttributes(
             input_ext=input_ext,
             file_path=file_path,
             read_function=read_function,
@@ -81,8 +102,3 @@ class ConversionData:
 
     def generate_import_query(self, table_name: str, file_path: Path) -> str:
         return f"EXECUTE import_statement(table_name := {table_name}, file_path := {file_path});"
-
-    def generate_prepared_import_statement(self) -> str:
-        return f"PREPARE import_statement AS CREATE TABLE $table_name AS FROM {
-            self.input_attributes.read_function
-        }('$file_path'{self.input_attributes.default_arguments});"

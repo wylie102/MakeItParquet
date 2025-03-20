@@ -42,7 +42,7 @@ class FileManager:
         self.input_path: Path = self.settings.file_info.file_path
 
         # Initialize input_ext and conversion file list
-        self.input_ext: str
+        self.input_ext: str | None = self.settings.master_input_ext
         self.conversion_file_list: list[FileInfo] = []
 
     def get_conversion_list(self) -> None:
@@ -62,12 +62,10 @@ class FileManager:
             SystemExit: If file extension is not in the ALLOWED_FILE_EXTENSIONS.
         """
         # Determine the input extension.
-        if not self.settings.supplied_input_ext:
-            self.settings.detected_input_ext = self.settings.file_info.file_extension
-            self.input_ext = self.settings.detected_input_ext
-        else:
-            self.input_ext = self.settings.supplied_input_ext
+        if not self.input_ext:
+            self.settings.detected_input_ext = self.settings.file_info.file_ext
 
+        # Validate input_ext
         if (
             self.input_ext not in ALLOWED_FILE_EXTENSIONS
         ):  # TODO consider changing to allow re-entering of input extension or checking the input/output flags, and/or performing a manual check on the input type
@@ -102,17 +100,16 @@ class DirectoryManager(FileManager):
 
     @override
     def _get_input_extension(self):
-        if not self.settings.supplied_input_ext:
+        if not self.input_ext:
             self._detect_majority_extension()
-        else:
-            self.input_ext: str = self.settings.supplied_input_ext
 
     @override
     def _set_conversion_file_list(self):
         """Set input extension and file list. Also updates flags."""
-        self.conversion_file_list: list[FileInfo] = self.extension_file_groups[
-            self.input_ext
-        ]
+        if self.input_ext:
+            self.conversion_file_list: list[FileInfo] = self.extension_file_groups[
+                self.input_ext
+            ]
         self._order_files_by_size()
 
     def _order_files_by_size(self):
@@ -148,7 +145,7 @@ class DirectoryManager(FileManager):
     def _group_files_by_extension(self, info_dicts_list: list[FileInfo]):
         """Group files by extension and count the number of files for each extension."""
         for file_info in info_dicts_list:
-            ext: str = file_info.file_extension
+            ext: str = file_info.file_ext
             if ext in ALLOWED_FILE_EXTENSIONS:
                 self.extension_file_groups[ext].append(file_info)
                 self.extension_counts[ext] += 1
@@ -168,9 +165,8 @@ class DirectoryManager(FileManager):
 
         # If no majority file format then prompt user for input format
         if self._no_clear_majority_file_format():
-            prompt_for_input_extension()
+            prompt_for_input_extension(self.settings)
         self.settings.detected_input_ext = list(self.extension_counts.keys())[0]
-        self.input_ext = self.settings.detected_input_ext
 
     def _sort_extensions_by_count(self):
         """Sort the extensions by the number of files in each group."""
@@ -190,6 +186,3 @@ class DirectoryManager(FileManager):
                 )
                 return True
         return False
-
-    def set_input_extension(self, input_ext: str) -> None:
-        self.input_ext = input_ext

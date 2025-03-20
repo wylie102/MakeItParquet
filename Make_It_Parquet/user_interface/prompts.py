@@ -25,7 +25,8 @@ def prompt_for_output_extension(input_ext: str, settings: Settings):
             _offer_chance_to_change_input_ext(input_ext, output_ext, settings)
             continue
 
-        return output_ext
+        settings.supplied_output_ext = output_ext
+        break
 
 
 def _get_extension() -> str:
@@ -77,7 +78,9 @@ def _offer_chance_to_change_input_ext(
         )
         # Wishes to change from detected input extension.
         if _yes_no_bool():
-            prompt_for_input_extension(file_manager)
+            prompt_for_input_extension(
+                settings
+            )  # TODO: place checks/restarts on conversion logic after this is called. Need to check files with input_ext exist.
         # Wishes to keep detected input extension.
         else:
             logging.info("Please enter a different output format.")
@@ -101,7 +104,6 @@ def prompt_for_input_extension(settings: Settings):
     """
     input_ext: str = _get_extension()
     settings.update_input_ext(input_ext, "supplied")
-    file_manager.input_ext = input_ext
     logging.info(f"Input extension set to: {input_ext}")
 
 

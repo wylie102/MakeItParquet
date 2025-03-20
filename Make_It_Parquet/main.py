@@ -8,6 +8,7 @@
 Make-it-Parquet!: A data file conversion tool powered by DuckDB.
 """
 
+import threading
 from Make_It_Parquet.conversion_manager import ConversionManager
 
 from Make_It_Parquet.file_manager import DirectoryManager, FileManager
@@ -36,22 +37,37 @@ def create_file_manager(
 
 def main() -> None:
     """
-    Initialises the application settings and triggers the conversion process.
+    Initializes the application settings, creates the file manager and conversion manager,
+    and runs export preparation and conversion concurrently.
     """
-    # Parse CLI arguments and store apliccable ones in Settings object.
+    # Parse CLI arguments and initialize settings.
     args: CLIArgs = parse_cli_arguments()
     settings: Settings = Settings(args)
 
-    # Create FileManager and analyze files.
-    file_manager: FileManager | DirectoryManager = create_file_manager(settings)
+    # Create FileManager (or DirectoryManager) and generate the conversion file list.
+    file_manager = create_file_manager(settings)
     file_manager.get_conversion_list()
 
-    # Trigger conversion process.
-    conversion_manager: ConversionManager = ConversionManager(file_manager)
-    conversion_manager.prepare_for_export()
-    conversion_manager.run_conversion()
+    # Initialize the ConversionManager.
+    conversion_manager = ConversionManager(file_manager)
 
-    # End program and ensure correct cleanup.
+    # Create threads for export preparation and conversion processing.
+    thread_prepare = threading.Thread(
+        target=conversion_manager.prepare_for_export, name="PrepareExportThread"
+    )
+    thread_run = threading.Thread(
+        target=conversion_manager.run_conversion, name="RunConversionThread"
+    )
+
+    # Start both threads.
+    thread_run.start()
+    thread_prepare.start()
+
+    # Wait for both threads to complete.
+    thread_prepare.join()
+    thread_run.join()
+
+    # Clean up and exit.
     settings.exit_program("Conversion complete.")
 
 

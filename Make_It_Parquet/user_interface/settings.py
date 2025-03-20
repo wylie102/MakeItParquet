@@ -7,16 +7,16 @@ Additionally, the InputOutputFlags class is used to manage flags related to how 
 """
 
 import logging
-from Make_It_Parquet.extension_mapping import ALLOWED_FILE_EXTENSIONS
-from Make_It_Parquet.file_information import (
+from ..extension_mapping import ALLOWED_FILE_EXTENSIONS
+from ..file_information import (
     FileInfo,
     create_file_info,
 )
-from Make_It_Parquet.user_interface.cli_parser import (
+from .cli_parser import (
     CLIArgs,
     get_input_output_extensions,
 )
-from Make_It_Parquet.user_interface.logger import Logger
+from .logger import Logger
 
 
 class Settings:

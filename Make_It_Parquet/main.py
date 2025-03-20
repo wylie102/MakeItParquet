@@ -9,11 +9,11 @@ Make-it-Parquet!: A data file conversion tool powered by DuckDB.
 """
 
 import threading
-from Make_It_Parquet.conversion_manager import ConversionManager
+from .conversion_manager import ConversionManager
 
-from Make_It_Parquet.file_manager import DirectoryManager, FileManager
-from Make_It_Parquet.user_interface.cli_parser import parse_cli_arguments, CLIArgs
-from Make_It_Parquet.user_interface.settings import Settings
+from .file_manager import DirectoryManager, FileManager
+from .user_interface.cli_parser import parse_cli_arguments, CLIArgs
+from .user_interface.settings import Settings
 
 
 def create_file_manager(

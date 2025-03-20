@@ -18,13 +18,13 @@ from collections import defaultdict
 from typing import override
 
 
-from Make_It_Parquet.extension_mapping import ALLOWED_FILE_EXTENSIONS
-from Make_It_Parquet.file_information import FileInfo, create_file_info
-from Make_It_Parquet.user_interface.prompts import prompt_for_input_extension
+from .extension_mapping import ALLOWED_FILE_EXTENSIONS
+from .file_information import FileInfo, create_file_info
+from .user_interface.prompts import prompt_for_input_extension
 
 TYPE_CHECKING = False
 if TYPE_CHECKING:
-    from Make_It_Parquet.user_interface.settings import Settings
+    from .user_interface.settings import Settings
     from pathlib import Path
 
 

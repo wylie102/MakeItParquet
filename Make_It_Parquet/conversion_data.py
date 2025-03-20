@@ -9,7 +9,7 @@ from typing import NamedTuple
 import uuid
 from pathlib import Path
 
-from Make_It_Parquet.file_information import FileInfo
+from .file_information import FileInfo
 
 
 class _SQLReadStatementMapping(NamedTuple):

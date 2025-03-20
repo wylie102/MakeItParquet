@@ -7,13 +7,13 @@ import time
 import uuid
 import tempfile
 import duckdb
-from Make_It_Parquet.conversion_data import ConversionData, ExportAttributes
-from Make_It_Parquet.user_interface.prompts import prompt_for_output_extension
+from .conversion_data import ConversionData, ExportAttributes
+from .user_interface.prompts import prompt_for_output_extension
 
 TYPE_CHECKING = False
 if TYPE_CHECKING:
-    from Make_It_Parquet.file_information import FileInfo
-    from Make_It_Parquet.file_manager import FileManager, DirectoryManager
+    from .file_information import FileInfo
+    from .file_manager import FileManager, DirectoryManager
 
 
 class ConversionManager:

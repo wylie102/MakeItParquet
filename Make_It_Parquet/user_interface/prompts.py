@@ -1,11 +1,12 @@
 #! /usr/bin/env python3
 import logging
 from pathlib import Path
-from Make_It_Parquet.extension_mapping import ALIAS_TO_EXTENSION_MAP
+
+from ..extension_mapping import ALIAS_TO_EXTENSION_MAP
 
 TYPE_CHECKING = False
 if TYPE_CHECKING:
-    from Make_It_Parquet.user_interface.settings import Settings
+    from .settings import Settings
 
 
 def prompt_for_output_extension(input_ext: str, settings: Settings):

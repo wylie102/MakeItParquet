@@ -14,7 +14,6 @@ class Logger(logging.Logger):
     def __init__(self, log_level: str | None) -> None:
         super().__init__("Make-it-Parquet!")
         self.log_queue: queue.Queue[str] = queue.Queue()
-        self.logger: logging.Logger = logging.getLogger("Make-it-Parquet!")
 
         self.default_log_level: int = logging.INFO
         self.active_log_level: int = self._set_logging_level(log_level)
@@ -36,7 +35,7 @@ class Logger(logging.Logger):
 
         Sets up queue-based logging with console output.
         """
-        self.logger.setLevel(self.active_log_level)
+        self.setLevel(self.active_log_level)
         self.console_handler: logging.StreamHandler[TextIO] = (
             self._setup_console_handler()
         )
@@ -49,9 +48,7 @@ class Logger(logging.Logger):
         Setup console handler.
         """
         console_handler = logging.StreamHandler(sys.stdout)
-        formatter = logging.Formatter(
-            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-        )
+        formatter = logging.Formatter("%(asctime)s - %(message)s", datefmt="%H:%M:%S")
         console_handler.setFormatter(formatter)
         return console_handler
 
@@ -60,7 +57,7 @@ class Logger(logging.Logger):
         Setup queue handler.
         """
         queue_handler = QueueHandler(self.log_queue)
-        self.logger.addHandler(queue_handler)
+        self.addHandler(queue_handler)
         return queue_handler
 
     def _setup_queue_listener(self):

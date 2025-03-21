@@ -8,8 +8,8 @@ Additionally, the InputOutputFlags class is used to manage flags related to how 
 
 import logging
 
-from ..extension_mapping import ALLOWED_FILE_EXTENSIONS
-from ..file_information import (
+from Make_It_Parquet.extension_mapping import ALLOWED_FILE_EXTENSIONS
+from Make_It_Parquet.file_information import (
     FileInfo,
     create_file_info,
 )
@@ -50,7 +50,7 @@ class Settings:
         # self.excel_settings = None
         # self.txt_settings = None
 
-    def exit_program(self, message: str, error_type: str | None = "error") -> None:
+    def exit_program(self, message: str, error_type: str | None = "info") -> None:
         """
         Exit program with logging and cleanup.
 
@@ -63,6 +63,8 @@ class Settings:
             self.logger.error(message)
         elif error_type == "exception":
             self.logger.exception(message)
+        else:
+            self.logger.info(message)
 
         self.logger.stop_logging()
         exit(1)  # TODO: look at deleting any converted files etc. if needed.

@@ -3,10 +3,7 @@ import logging
 from pathlib import Path
 
 from ..extension_mapping import ALIAS_TO_EXTENSION_MAP
-
-TYPE_CHECKING = False
-if TYPE_CHECKING:
-    from .settings import Settings
+from .settings import Settings
 
 
 def prompt_for_output_extension(input_ext: str, settings: Settings):

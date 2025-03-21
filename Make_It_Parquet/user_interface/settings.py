@@ -7,6 +7,7 @@ Additionally, the InputOutputFlags class is used to manage flags related to how 
 """
 
 import logging
+
 from ..extension_mapping import ALLOWED_FILE_EXTENSIONS
 from ..file_information import (
     FileInfo,

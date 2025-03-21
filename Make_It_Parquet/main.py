@@ -1,4 +1,4 @@
-#!/usr/bin/env uv run
+#!/usr/bin/env uv run -m
 # /// script
 # dependencies = [
 #     "duckdb",
@@ -9,11 +9,11 @@ Make-it-Parquet!: A data file conversion tool powered by DuckDB.
 """
 
 import threading
-from .conversion_manager import ConversionManager
 
-from .file_manager import DirectoryManager, FileManager
-from .user_interface.cli_parser import parse_cli_arguments, CLIArgs
-from .user_interface.settings import Settings
+from Make_It_Parquet.conversion_manager import ConversionManager
+from Make_It_Parquet.file_manager import DirectoryManager, FileManager
+from Make_It_Parquet.user_interface.cli_parser import CLIArgs, parse_cli_arguments
+from Make_It_Parquet.user_interface.settings import Settings
 
 
 def create_file_manager(
@@ -60,8 +60,8 @@ def main() -> None:
     )
 
     # Start both threads.
-    thread_run.start()
     thread_prepare.start()
+    thread_run.start()
 
     # Wait for both threads to complete.
     thread_prepare.join()

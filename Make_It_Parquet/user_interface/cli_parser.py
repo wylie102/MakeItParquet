@@ -1,9 +1,10 @@
 #! /usr/bin/env python3
 
 import argparse
-from dataclasses import dataclass
 import logging
+from dataclasses import dataclass
 from pathlib import Path
+
 from ..extension_mapping import ALIAS_TO_EXTENSION_MAP
 
 

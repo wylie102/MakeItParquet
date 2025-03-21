@@ -15,17 +15,13 @@ The managers handle:
 
 import os
 from collections import defaultdict
+from pathlib import Path
 from typing import override
-
 
 from .extension_mapping import ALLOWED_FILE_EXTENSIONS
 from .file_information import FileInfo, create_file_info
 from .user_interface.prompts import prompt_for_input_extension
-
-TYPE_CHECKING = False
-if TYPE_CHECKING:
-    from .user_interface.settings import Settings
-    from pathlib import Path
+from .user_interface.settings import Settings
 
 
 class FileManager:
@@ -42,8 +38,11 @@ class FileManager:
         self.input_path: Path = self.settings.file_info.file_path
 
         # Initialize input_ext and conversion file list
-        self.input_ext: str | None = self.settings.master_input_ext
         self.conversion_file_list: list[FileInfo] = []
+
+    @property
+    def input_ext(self) -> str | None:
+        return self.settings.master_input_ext
 
     def get_conversion_list(self) -> None:
         # Check input extension and generate conversion file list.

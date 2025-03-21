@@ -1,19 +1,18 @@
 #!/usr/bin/env python3
 """Manages the conversion of files to different formats using DuckDB."""
 
-from queue import Queue
 import os
+import tempfile
 import time
 import uuid
-import tempfile
-import duckdb
-from .conversion_data import ConversionData, ExportAttributes
-from .user_interface.prompts import prompt_for_output_extension
+from queue import Queue
 
-TYPE_CHECKING = False
-if TYPE_CHECKING:
-    from .file_information import FileInfo
-    from .file_manager import FileManager, DirectoryManager
+import duckdb
+
+from .conversion_data import ConversionData, ExportAttributes
+from .file_information import FileInfo
+from .file_manager import DirectoryManager, FileManager
+from .user_interface.prompts import prompt_for_output_extension
 
 
 class ConversionManager:
@@ -44,7 +43,6 @@ class ConversionManager:
         """
         self.file_manager: FileManager | DirectoryManager = file_manager
         self.file_info: FileInfo = self.file_manager.settings.file_info
-        self.output_ext: str | None = file_manager.settings.master_output_ext
         self.export_attributes: ExportAttributes
         self.db_path: str = os.path.join(
             tempfile.gettempdir(), f"make_it_parquet_{uuid.uuid4()}.db"
@@ -54,15 +52,11 @@ class ConversionManager:
         self.pending_exports: list[ConversionData] = []
         self.one_in_one_out: bool = self.output_ext is not None
 
-        if self.file_manager.input_ext:  # TODO: probably move into run_conversion
-            self._store_prepared_import_statement(self.file_manager.input_ext)
         self._populate_import_queue(file_manager.conversion_file_list)
 
-    def _store_prepared_import_statement(self, input_ext: str) -> None:
-        # Store prepared statement in duckdb database.
-        _ = self.conn.execute(
-            ConversionData.generate_prepared_import_statement(input_ext)
-        )
+    @property
+    def output_ext(self) -> str | None:
+        return self.file_manager.settings.master_output_ext
 
     def _populate_import_queue(self, conversion_file_list: list[FileInfo]) -> None:
         """Populates the import queue with file paths.
@@ -147,16 +141,8 @@ class ConversionManager:
                     self.file_manager.input_ext, self.file_manager.settings
                 )
 
-    def _store_prepared_export_statement(
-        self, export_attributes: ExportAttributes
-    ) -> None:
-        # Store prepared statement in duckdb database.
-        export_statement = export_attributes.prepared_export_statement
-        _ = self.conn.execute(export_statement)
-
     def _process_pending_exports(self) -> None:
         """Processes all pending exports in order."""
-        self._store_prepared_export_statement(self.export_attributes)
         self.export_attributes.output_directory_path.mkdir(exist_ok=True, parents=True)
         for conversion_data in self.pending_exports:
             self._export_file(conversion_data)

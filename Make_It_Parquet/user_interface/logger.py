@@ -1,8 +1,8 @@
 #! /usr/bin/env python3
 import logging
-from logging.handlers import QueueHandler, QueueListener
 import queue
 import sys
+from logging.handlers import QueueHandler, QueueListener
 from typing import TextIO
 
 

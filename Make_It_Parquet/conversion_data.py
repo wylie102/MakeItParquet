@@ -3,11 +3,12 @@
 Module that contains dataclasses related to the conversion process in MakeItParquet!
 """
 
-from dataclasses import dataclass
 import re
-from typing import NamedTuple
 import uuid
+from dataclasses import dataclass
 from pathlib import Path
+from typing import NamedTuple
+
 
 from .file_information import FileInfo
 
@@ -52,7 +53,7 @@ class ConversionInputAttributes(NamedTuple):
 class ExportAttributes:
     output_ext: str
     output_directory_path: Path
-    prepared_export_statement: str
+    output_key: str
 
 
 class ConversionData:
@@ -60,15 +61,6 @@ class ConversionData:
     read_statement_mapping: _SQLReadStatementMapping = _SQLReadStatementMapping()
     default_argument_mapping: _DefaultArgumentMapping = _DefaultArgumentMapping()
     export_argument_mapping: _ExportArgumentMapping = _ExportArgumentMapping()
-
-    @staticmethod
-    def generate_prepared_import_statement(input_ext: str) -> str:
-        ext_key: str = ConversionData._generate_ext_key(input_ext)
-        read_function: str = ConversionData._generate_read_function(ext_key)
-        default_arguments: str = ConversionData._generate_default_arguments(ext_key)
-        return f"PREPARE import_statement AS CREATE TABLE $table_name AS FROM {
-            read_function
-        }('$file_path'{default_arguments});"
 
     @staticmethod
     def _generate_ext_key(ext: str) -> str:
@@ -105,13 +97,10 @@ class ConversionData:
         output_directory_path: Path = ConversionData._get_parent_directory_path(
             file_info, input_ext_key, output_ext_key
         )
-        prepared_export_statement: str = (
-            ConversionData._generate_prepared_export_statement(output_ext_key)
-        )
 
         # assign output_ext, output_directory_path, and prepared_export_statement to dataclass.
         export_attributes: ExportAttributes = ExportAttributes(
-            output_ext, output_directory_path, prepared_export_statement
+            output_ext, output_directory_path, output_ext_key
         )
 
         # return dataclass.
@@ -128,11 +117,6 @@ class ConversionData:
                 input_ext_key, output_ext_key, file_info.file_path
             )
         return new_directory_path
-
-    @staticmethod
-    def _generate_prepared_export_statement(ext_key: str) -> str:
-        export_arguments: str = ConversionData._generate_export_arguments(ext_key)
-        return f"PREPARE export_statement COPY $table_name TO '$file_path' {export_arguments};"
 
     @staticmethod
     def _generate_export_arguments(ext_key: str) -> str:
@@ -207,7 +191,9 @@ class ConversionData:
         read_function: str = ConversionData._generate_read_function(ext_key)
         default_arguments: str = ConversionData._generate_default_arguments(ext_key)
         table_name = self._create_unique_table_name(file_path)
-        import_query = self.generate_import_query(table_name, file_path)
+        import_query = self.generate_import_query(
+            table_name, file_path, read_function, default_arguments
+        )
 
         self.import_attributes: ConversionInputAttributes = ConversionInputAttributes(
             input_ext=input_ext,
@@ -221,11 +207,22 @@ class ConversionData:
         self.export_query: str
 
     def _create_unique_table_name(self, file_path: Path) -> str:
-        name: str = file_path.name
-        return f"{name}_{uuid.uuid4().hex[:8]}"
+        file_name: str = file_path.stem
+        base_name = f"{file_name}_{uuid.uuid4()}"
+        hexed_name = base_name.encode("utf-8").hex()
+        table_name = f"T_{hexed_name}"
 
-    def generate_import_query(self, table_name: str, file_path: Path) -> str:
-        return f"EXECUTE import_statement(table_name := {table_name}, file_path := {file_path});"
+        return table_name
+
+    def generate_import_query(
+        self,
+        table_name: str,
+        file_path: Path,
+        read_function: str,
+        default_arguments: str,
+    ) -> str:
+        query = f"CREATE TABLE {table_name} AS FROM {read_function}('{file_path}'{default_arguments});"
+        return query
 
     def generate_export_query(self, export_attributes: ExportAttributes) -> str:
         table_name = self.import_attributes.table_name
@@ -235,6 +232,12 @@ class ConversionData:
         output_ext = export_attributes.output_ext
         # concatenate output path
         self.output_path = directory_path / file_name / output_ext
+
+        export_arguments: str = getattr(
+            self.export_argument_mapping, export_attributes.output_key
+        )
         # construct query
-        self.export_query = f"EXECUTE export_statement(table_name := {table_name}, output_path := {self.output_path} "
+        self.export_query = (
+            f"COPY {table_name} TO '{self.output_path}' {export_arguments}"
+        )
         return self.export_query

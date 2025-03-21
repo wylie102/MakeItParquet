@@ -146,6 +146,7 @@ class ConversionManager:
         self.export_attributes.output_directory_path.mkdir(exist_ok=True, parents=True)
         for conversion_data in self.pending_exports:
             self._export_file(conversion_data)
+        self.pending_exports.clear()
 
     def _export_file(self, conversion_data: ConversionData) -> None:
         """

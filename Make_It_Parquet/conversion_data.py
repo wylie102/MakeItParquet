@@ -128,9 +128,9 @@ class ConversionData:
         """
         Adjust the replacement string (`alias`) to match the case of the original match.
 
-        :param alias: The correct-case replacement string.
+        :param alias: The desired replacement string.
         :param match: The match object containing the original matched substring.
-        :return: The alias string adjusted to match the case of the original.
+        :return: The alias adjusted to the matched case.
         """
         orig: str = match.group()
         if orig.isupper():
@@ -143,20 +143,21 @@ class ConversionData:
             return alias
 
     @staticmethod
-    def replace_alias_in_string(target_string: str, alias: str) -> str:
+    def replace_alias_in_string(full_string: str, search_sub: str, alias: str) -> str:
         """
-        Replace occurrences of target_string in a case-insensitive manner with alias,
-        preserving the original casing format.
+        Replace occurrences of search_sub within full_string with alias,
+        preserving the case of each match.
 
-        :param target_string: The string in which to search for the input format.
-        :param alias: The replacement string (output format) with the correct case.
+        :param full_string: The complete string in which to perform the replacement.
+        :param search_sub: The substring to search for (e.g. the input format).
+        :param alias: The replacement string (e.g. the output format).
         :return: The modified string with replacements made.
         """
-        pattern = re.compile(re.escape(target_string), re.IGNORECASE)
+        pattern = re.compile(re.escape(search_sub), re.IGNORECASE)
         result, count = pattern.subn(
-            lambda match: ConversionData.replacer(alias, match), target_string
+            lambda match: ConversionData.replacer(alias, match), full_string
         )
-        return result if count > 0 else target_string
+        return result if count > 0 else full_string
 
     @staticmethod
     def generate_output_path(input_key: str, output_key: str, input_path: Path) -> Path:
@@ -169,18 +170,19 @@ class ConversionData:
         - If not, appends an underscore and the output format to the original name.
         - Returns a new Path with the updated name in the same directory.
 
-        :param input_key: The input file format to look for (e.g., "csv").
-        :param output_key: The desired output file format (e.g., "parquet").
+        :param input_key: The input file format to look for (e.g., "parquet").
+        :param output_key: The desired output file format (e.g., "csv").
         :param input_path: The Path object for the original folder (or file).
         :return: A new Path with the modified name.
         """
-        original_name = input_path.name  # Preserve the original case
-        # Use lower-case for checking presence of the input format
+        original_name = input_path.name  # Preserve the original name and its case
         if input_key and input_key.lower() in original_name.lower():
-            new_name = ConversionData.replace_alias_in_string(original_name, output_key)
+            # Only replace the portion that matches input_key
+            new_name = ConversionData.replace_alias_in_string(
+                original_name, input_key, output_key
+            )
         else:
             new_name = f"{original_name}_{output_key}"
-        # Return a new Path using the same parent directory as the original
         return input_path.with_name(new_name)
 
     def __init__(self, input_ext: str, file_path: Path) -> None:
@@ -228,10 +230,11 @@ class ConversionData:
         table_name = self.import_attributes.table_name
         # output_path constituents
         directory_path = export_attributes.output_directory_path
-        file_name = self.import_attributes.file_path.stem
+        file_stem = self.import_attributes.file_path.stem
         output_ext = export_attributes.output_ext
+        file_name: str = f"{file_stem}{output_ext}"
         # concatenate output path
-        self.output_path = directory_path / file_name / output_ext
+        self.output_path = directory_path / file_name
 
         export_arguments: str = getattr(
             self.export_argument_mapping, export_attributes.output_key
